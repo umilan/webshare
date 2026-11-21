@@ -61,8 +61,9 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #scanBox .frame { position:absolute; inset:14%; border:3px solid rgba(255,255,255,.85); border-radius:14px; box-shadow:0 0 0 999px rgba(0,0,0,.35); }
 #scanBox.hit .frame { border-color:#2ecc71; }
 #scanMsg { text-align:center; max-width:420px; font-size:14px; }
-#rxModal .row { display:flex; gap:10px; }
-#rxModal input { font-size:18px; width:8em; }
+#rxModal .row { display:flex; gap:10px; width:min(92vw, 640px); }
+#rxModal #rxClose { width:min(92vw, 640px); }
+#rxModal input { font-size:18px; flex:1; min-width:0; }
 #rxModal button { padding:11px 20px; font-size:16px; }
 #idleActions { display:flex; gap:12px; }
 #idleActions[hidden] { display:none; }
@@ -225,7 +226,7 @@ button.big { padding:11px 22px; font-size:16px; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.17.2'; // bump on every published change
+const APP_VERSION = '1.17.3'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
