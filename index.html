@@ -45,12 +45,13 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #qr { background:#fff; padding:14px; border-radius:16px; width:min(86vw, 50vh, 560px); }
 #qr img, #qr canvas { display:block; width:100% !important; height:auto !important; image-rendering:pixelated; }
 #qrCode { font-size:28px; font-weight:800; letter-spacing:.15em; }
-#qrModal .urlRow { display:flex; align-items:stretch; gap:8px; width:min(92vw, 640px); }
-#qrModal .iconBtn { display:flex; align-items:center; justify-content:center; padding:0 14px; }
+#qrModal .urlRow { display:flex; align-items:stretch; width:min(92vw, 640px); background:#0b0d11; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+#qrModal .iconBtn { display:flex; align-items:center; justify-content:center; padding:0 16px; border:0; border-left:1px solid var(--line); border-radius:0; background:transparent; color:var(--muted); }
+#qrModal .iconBtn:hover { color:var(--text); background:#161a22; }
 #qrModal .iconBtn svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-#qrModal .iconBtn.ok { background:#1f8f4e; border-color:#1f8f4e; color:#fff; }
+#qrModal .iconBtn.ok { background:#1f8f4e; color:#fff; }
 #qrModal #qrShare, #qrModal #qrClose { width:min(92vw, 640px); }
-#link { flex:1; min-width:0; text-align:center; font-size:16px; word-break:break-all; color:var(--text); background:#0b0d11; border:1px solid var(--line); border-radius:10px; padding:10px 14px; user-select:all; }
+#link { flex:1; min-width:0; text-align:left; font-size:15px; word-break:break-all; color:var(--text); padding:10px 14px; user-select:all; align-self:center; }
 #qrModal .row { display:flex; gap:10px; }
 #rxModal { position:fixed; inset:0; z-index:10; background:rgba(8,9,12,.96); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; }
 #rxModal[hidden] { display:none; }
@@ -224,7 +225,7 @@ button.big { padding:11px 22px; font-size:16px; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.17.1'; // bump on every published change
+const APP_VERSION = '1.17.2'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
