@@ -273,7 +273,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.20.0'; // bump on every published change
+const APP_VERSION = '1.21.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -386,6 +386,63 @@ function startHome() {
   });
   $('zoomRange').addEventListener('change', () => setLens(+$('zoomRange').value));
 
+  const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---- photo / video from the gallery, streamed through a canvas (works on iPhone too)
+  let currentFile = null;
+  const fileInput = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*,video/*', hidden: true });
+  document.body.appendChild(fileInput);
+  function pickFile() {
+    return new Promise((resolve, reject) => {
+      fileInput.value = '';
+      const done = (f) => { fileInput.onchange = fileInput.oncancel = null; f ? resolve(f) : reject(Object.assign(new Error('No file chosen'), { name: 'NotAllowedError' })); };
+      fileInput.onchange = () => done(fileInput.files[0]);
+      fileInput.oncancel = () => done(null);
+      fileInput.click();
+    });
+  }
+  async function streamFromFile(file, h, withAudio) {
+    const url = URL.createObjectURL(file);
+    const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+    const size = (w, hh) => { // shorter side <= chosen quality, longer side <= 1920
+      const k = Math.min(1, h / Math.min(w, hh), 1920 / Math.max(w, hh));
+      canvas.width = Math.round(w * k) & ~1; canvas.height = Math.round(hh * k) & ~1;
+    };
+    let timer = null, vid = null, ac = null, ms;
+    try {
+      if (file.type.startsWith('video/')) {
+        vid = Object.assign(document.createElement('video'), { src: url, loop: true, playsInline: true, muted: !withAudio });
+        vid.setAttribute('playsinline', '');
+        await new Promise((ok, fail) => { vid.onloadedmetadata = ok; vid.onerror = () => fail(new Error('This video format is not supported.')); });
+        try { await vid.play(); } catch (e) { vid.muted = true; await vid.play(); }
+        size(vid.videoWidth, vid.videoHeight);
+        const draw = () => ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+        draw(); timer = setInterval(draw, 33);
+        ms = canvas.captureStream(30);
+        ms.getVideoTracks().forEach(t => { try { t.contentHint = 'motion'; } catch (e) {} });
+        if (withAudio && !vid.muted) {
+          try {
+            ac = new (window.AudioContext || window.webkitAudioContext)();
+            const dest = ac.createMediaStreamDestination();
+            ac.createMediaElementSource(vid).connect(dest);
+            dest.stream.getAudioTracks().forEach(t => ms.addTrack(t));
+          } catch (e) {}
+        }
+      } else {
+        const img = new Image(); img.src = url;
+        try { await img.decode(); } catch (e) { throw new Error('This image format is not supported.'); }
+        size(img.naturalWidth, img.naturalHeight);
+        const draw = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        draw(); timer = setInterval(draw, 200); // keep sending frames so viewers get a picture
+        ms = canvas.captureStream(5);
+        ms.getVideoTracks().forEach(t => { try { t.contentHint = 'detail'; } catch (e) {} }); // keep resolution for still images
+      }
+    } catch (e) { URL.revokeObjectURL(url); throw e; }
+    ms._cleanup = () => { clearInterval(timer); if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); } ac?.close(); URL.revokeObjectURL(url); };
+    return ms;
+  }
+  const stopStream = (st) => { if (!st) return; st.getTracks().forEach(t => t.stop()); st._cleanup?.(); };
+
   async function listCameras() {
     const cur = $('camera').value;
     let devs = [];
@@ -402,15 +459,26 @@ function startHome() {
       if (named.length) named.forEach((d, i) => opts.push([d.deviceId, '🎥 ' + nice(d.label, i)]));
       else opts.push(['camera', '🎥 Camera']);
     }
-    $('camera').innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')
+    // photo / video from the gallery sits next to Screen
+    const fileOpts = currentFile
+      ? [['file', '🖼️ ' + currentFile.name], ['file-new', '📂 Choose another photo / video…']]
+      : [['file', '🖼️ Photo / video from gallery']];
+    if (canScreen) opts.splice(1, 0, ...fileOpts); else opts.push(...fileOpts);
+    $('camera').innerHTML = opts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
       + (canScreen ? '' : '<option value="screen" disabled>🖥️ Screen (computers only)</option>');
     if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
   }
-  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen or camera' : 'camera'} (pick the source above), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
+  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen, camera' : 'camera'} or a photo / video from your gallery (pick the source above), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
   listCameras();
 
   async function capture() {
     const h = quality, audio = audioOn;
+    const v = $('camera').value;
+    if (v === 'file' || v === 'file-new') {
+      if (v === 'file-new' || !currentFile) { currentFile = await pickFile(); await listCameras(); }
+      $('camera').value = 'file';
+      return streamFromFile(currentFile, h, audio);
+    }
     if ($('camera').value === 'screen')
       return navigator.mediaDevices.getDisplayMedia({ video: { height: { ideal: h }, frameRate: { ideal: 30 } }, audio });
     const cam = $('camera').value || 'environment';
@@ -444,8 +512,8 @@ function startHome() {
     const value = $('camera').value;
     if (value !== 'environment') lensId = null; // lens choice only applies to the rear camera
     // phones often can't open a second camera while one is running -> release the old one first
-    const releaseFirst = stream && value !== 'screen';
-    if (releaseFirst) stream.getTracks().forEach(t => t.stop());
+    const releaseFirst = stream && value !== 'screen' && !value.startsWith('file');
+    if (releaseFirst) stopStream(stream);
     let s;
     try { s = await capture(); }
     catch (e) {
@@ -456,10 +524,10 @@ function startHome() {
         if (releaseFirst) { try { s = await capture(); } catch (e2) { return stop(); } } else return;
       } else return;
     }
-    if (stream && !releaseFirst) stream.getTracks().forEach(t => t.stop());
+    if (stream && !releaseFirst) stopStream(stream);
     stream = s; applied = $('camera').value; appliedLens = lensId;
     renderZoom();
-    $('previewWrap').classList.toggle('contain', applied === 'screen');
+    $('previewWrap').classList.toggle('contain', applied === 'screen' || applied === 'file');
     showPreview(stream); $('previewWrap').hidden = false; $('idle').hidden = true; $('idleActions').hidden = true;
     stream.getVideoTracks()[0].onended = stop;
     if (!peer) openPeer();
@@ -470,7 +538,7 @@ function startHome() {
   $('camera').addEventListener('change', liveUpdate);
 
   function stop() {
-    if (stream) stream.getTracks().forEach(t => t.stop());
+    stopStream(stream);
     stream = null; $('preview').srcObject = null; $('previewWrap').hidden = true; pill($('status'), 'connecting…'); $('idle').hidden = false; $('idleActions').hidden = false; hideEl($('qrModal'));
     for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
     conns.clear(); updateCount();
