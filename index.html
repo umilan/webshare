@@ -168,6 +168,18 @@ input[type=text] { padding:0 14px; display:block; }
   #topbar #prefsBtn { padding:0; }
   #bar button, #bar .home { width:var(--h-sm); padding:0; }
 }
+
+/* ---- lens "zoom" slider (switches between the phone's rear lenses) */
+#zoom { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); width:min(70%, 280px); padding:10px 16px 6px; border-radius:var(--r); background:rgba(0,0,0,.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+#zoom[hidden] { display:none; }
+#zoomRange { -webkit-appearance:none; appearance:none; width:100%; height:24px; background:transparent; margin:0; padding:0; border:0; display:block; }
+#zoomRange::-webkit-slider-runnable-track { height:4px; border-radius:2px; background:rgba(255,255,255,.35); }
+#zoomRange::-moz-range-track { height:4px; border-radius:2px; background:rgba(255,255,255,.35); }
+#zoomRange::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; margin-top:-9px; border-radius:50%; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.5); }
+#zoomRange::-moz-range-thumb { width:22px; height:22px; border:0; border-radius:50%; background:#fff; }
+#zoomLabels { display:flex; justify-content:space-between; margin:2px -6px 0; }
+#zoomLabels button { height:26px; min-width:38px; padding:0 6px; border:0; background:transparent; color:rgba(255,255,255,.7); font-size:13px; font-weight:600; border-radius:13px; }
+#zoomLabels button.on { color:#ffd60a; background:rgba(0,0,0,.35); }
 </style>
 </head>
 <body>
@@ -219,6 +231,10 @@ input[type=text] { padding:0 14px; display:block; }
     <div id="previewWrap" hidden>
       <video id="preview" autoplay muted playsinline></video>
       <span id="status" class="pill">connecting…</span>
+      <div id="zoom" hidden>
+        <input id="zoomRange" type="range" min="0" max="2" step="1" value="1" aria-label="Zoom (switches lens)">
+        <div id="zoomLabels"></div>
+      </div>
     </div>
     <div id="idle">
       <div style="font-size:42px">📡</div>
@@ -257,7 +273,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.18.2'; // bump on every published change
+const APP_VERSION = '1.19.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -324,10 +340,46 @@ function startHome() {
       .replace(/\bback\b/ig, 'Rear').replace(/\bfront\b/ig, 'Front').replace(/\s+/g, ' ').trim();
     return base ? `${base} camera` : `Camera ${i + 1}`;
   };
+  // ---- "zoom" = switching between the phone's rear lenses (iPhone labels them, e.g. "Back Ultra Wide Camera")
+  let lenses = [];      // [{ id, zoom, label }] sorted by zoom
+  let lensId = null;    // deviceId of the chosen rear lens (null = let the OS pick)
+  function buildLenses(devs) {
+    const found = {};
+    devs.forEach(d => {
+      const l = d.label || '';
+      if (!/back|rear|environment/i.test(l) || /dual|triple/i.test(l)) return; // skip virtual multi-lens devices
+      if (/ultra ?wide/i.test(l)) found[0.5] = d.deviceId;
+      else if (/tele/i.test(l)) found[3] = d.deviceId;
+      else if (/^(back|rear) camera$/i.test(l.trim()) || /wide/i.test(l)) found[1] = found[1] || d.deviceId;
+    });
+    lenses = Object.keys(found).map(Number).sort((a, b) => a - b).map(z => ({ id: found[z], zoom: z }));
+    if (lenses.length && !lenses.some(x => x.zoom === 1)) lenses = [];
+    renderZoom();
+  }
+  function renderZoom() {
+    const show = isMobile && stream && applied === 'environment' && lenses.length >= 2;
+    $('zoom').hidden = !show;
+    if (!show) return;
+    const cur = Math.max(0, lenses.findIndex(x => x.id === lensId) >= 0 ? lenses.findIndex(x => x.id === lensId) : lenses.findIndex(x => x.zoom === 1));
+    $('zoomRange').max = lenses.length - 1; $('zoomRange').value = cur;
+    $('zoomLabels').innerHTML = lenses.map((x, i) => `<button type="button" data-i="${i}" class="${i === cur ? 'on' : ''}">${x.zoom}×</button>`).join('');
+    $('zoomLabels').querySelectorAll('button').forEach(b => b.onclick = () => setLens(+b.dataset.i));
+  }
+  async function setLens(i) {
+    const lens = lenses[i]; if (!lens || lens.id === lensId || !stream) return renderZoom();
+    lensId = lens.id; renderZoom();
+    await start();
+  }
+  $('zoomRange').addEventListener('input', () => {
+    $('zoomLabels').querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', i === +$('zoomRange').value));
+  });
+  $('zoomRange').addEventListener('change', () => setLens(+$('zoomRange').value));
+
   async function listCameras() {
     const cur = $('camera').value;
     let devs = [];
     try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && d.deviceId); } catch (e) {}
+    if (isMobile) buildLenses(devs);
     const opts = [];
     const screenOpt = canScreen ? ['screen', '🖥️ Screen'] : null;
     if (screenOpt) opts.push(screenOpt);
@@ -352,7 +404,9 @@ function startHome() {
       return navigator.mediaDevices.getDisplayMedia({ video: { height: { ideal: h }, frameRate: { ideal: 30 } }, audio });
     const cam = $('camera').value || 'environment';
     const video = { height: { ideal: h } };
-    if (cam === 'user' || cam === 'environment') video.facingMode = cam; else if (cam !== 'camera') video.deviceId = { exact: cam };
+    if (cam === 'environment' && lensId) video.deviceId = { exact: lensId };
+    else if (cam === 'user' || cam === 'environment') video.facingMode = cam;
+    else if (cam !== 'camera') video.deviceId = { exact: cam };
     const s = await navigator.mediaDevices.getUserMedia({ video, audio });
     listCameras();
     return s;
@@ -374,8 +428,10 @@ function startHome() {
   }
   new ResizeObserver(() => { const v = $('preview'); if (v && v.srcObject) { v.style.width = '99.9%'; requestAnimationFrame(() => { v.style.width = ''; }); } }).observe($('previewWrap'));
   let applied = null; // source value of the running stream
+  let appliedLens = null;
   async function start() {
     const value = $('camera').value;
+    if (value !== 'environment') lensId = null; // lens choice only applies to the rear camera
     // phones often can't open a second camera while one is running -> release the old one first
     const releaseFirst = stream && value !== 'screen';
     if (releaseFirst) stream.getTracks().forEach(t => t.stop());
@@ -385,11 +441,13 @@ function startHome() {
       if (e.name !== 'NotAllowedError') toast(e.message || String(e));
       if (stream && applied != null) {
         $('camera').value = applied; // keep showing what is actually live
+        lensId = appliedLens;
         if (releaseFirst) { try { s = await capture(); } catch (e2) { return stop(); } } else return;
       } else return;
     }
     if (stream && !releaseFirst) stream.getTracks().forEach(t => t.stop());
-    stream = s; applied = $('camera').value;
+    stream = s; applied = $('camera').value; appliedLens = lensId;
+    renderZoom();
     $('previewWrap').classList.toggle('contain', applied === 'screen');
     showPreview(stream); $('previewWrap').hidden = false; $('idle').hidden = true; $('idleActions').hidden = true;
     stream.getVideoTracks()[0].onended = stop;
@@ -406,7 +464,7 @@ function startHome() {
     for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
     conns.clear(); updateCount();
     if (peer) { peer.destroy(); peer = null; }
-    applied = null; $('linkCard').hidden = true;
+    applied = null; appliedLens = null; $('zoom').hidden = true; $('linkCard').hidden = true;
   }
 
   function openPeer() {
