@@ -214,6 +214,11 @@ input[type=text] { padding:0 14px; display:block; }
 @keyframes dropUpOut { from { opacity:1; transform:none; } to { opacity:0; transform:translateY(6px) scale(.98); } }
 #srcMenu.anim-in, #prefs.anim-in { animation:dropUpIn .16s ease-out both; }
 #srcMenu.anim-out, #prefs.anim-out { animation:dropUpOut .14s ease-in both; }
+
+/* ---- app name + version on top */
+#appHeader { display:flex; align-items:baseline; justify-content:center; gap:8px; padding:10px 12px 2px; }
+#appHeader .appName { font-size:22px; font-weight:700; letter-spacing:.01em; }
+#appHeader .ver { font-size:13px; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -241,6 +246,7 @@ input[type=text] { padding:0 14px; display:block; }
     <button id="qrShare" class="primary" hidden>Share…</button>
     <button id="qrClose">Close</button>
   </div>
+  <header id="appHeader"><span class="appName">📡 WebShare</span><span class="ver"></span></header>
   <div id="stage">
     <div id="previewWrap" hidden>
       <video id="preview" autoplay muted playsinline></video>
@@ -290,7 +296,6 @@ input[type=text] { padding:0 14px; display:block; }
       <span class="muted" title="Viewers">👁 <b id="count">0</b></span>
       <button id="stop" class="danger">Stop</button>
     </span>
-    <span class="verText">WebShare <span class="ver"></span></span>
   </footer>
 </div>
 
@@ -311,7 +316,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.24.0'; // bump on every published change
+const APP_VERSION = '1.24.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
