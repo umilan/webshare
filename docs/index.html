@@ -28,7 +28,12 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); }
 .pill.live { background:var(--bad); border-color:var(--bad); color:#fff; font-weight:700; }
 #stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:16px; }
-#preview { max-width:100%; max-height:100%; background:#000; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+#previewWrap { position:relative; display:flex; max-width:100%; max-height:100%; min-height:0; }
+#preview { max-width:100%; max-height:100%; min-height:0; background:#000; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+#status { position:absolute; top:10px; left:10px; padding:2px 8px; font-size:11px; letter-spacing:.06em; background:rgba(0,0,0,.6); border-color:transparent; color:#fff; backdrop-filter:blur(4px); pointer-events:none; }
+#status.live { background:var(--bad); }
+#status.live::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:#fff; margin-right:5px; vertical-align:1px; animation:blink 1.4s infinite; }
+@keyframes blink { 50% { opacity:.25; } }
 #idle { text-align:center; color:var(--muted); }
 #idle .row { display:flex; gap:8px; justify-content:center; margin-top:12px; }
 #qrModal { position:fixed; inset:0; z-index:10; background:rgba(8,9,12,.94); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:20px; }
@@ -100,7 +105,10 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
     </div>
   </div>
   <div id="stage">
-    <video id="preview" autoplay muted playsinline hidden></video>
+    <div id="previewWrap" hidden>
+      <video id="preview" autoplay muted playsinline></video>
+      <span id="status" class="pill">connecting…</span>
+    </div>
     <div id="idle">
       <div style="font-size:42px">📡</div>
       <span id="hint">Choose <b>Screen</b> or <b>Camera</b> above and press <b>Start</b>.</span>
@@ -191,7 +199,7 @@ function startHome() {
     try { s = await capture(); } catch (e) { if (e.name !== 'NotAllowedError') alert(e.message || e); return; }
     if (stream) stream.getTracks().forEach(t => t.stop());
     stream = s;
-    $('preview').srcObject = stream; $('preview').hidden = false; $('idle').hidden = true;
+    $('preview').srcObject = stream; $('previewWrap').hidden = false; $('idle').hidden = true;
     stream.getVideoTracks()[0].onended = stop;
     $('start').textContent = 'Switch'; $('stop').hidden = false;
     if (!peer) openPeer();
@@ -200,7 +208,7 @@ function startHome() {
 
   function stop() {
     if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = null; $('preview').srcObject = null; $('preview').hidden = true; $('idle').hidden = false; $('qrModal').hidden = true;
+    stream = null; $('preview').srcObject = null; $('previewWrap').hidden = true; pill($('status'), 'connecting…'); $('idle').hidden = false; $('qrModal').hidden = true;
     for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
     conns.clear(); updateCount();
     if (peer) { peer.destroy(); peer = null; }
@@ -208,20 +216,23 @@ function startHome() {
   }
 
   function openPeer() {
+    pill($('status'), 'connecting…');
     peer = new Peer(PREFIX + code);
     peer.on('open', () => {
       store.set('webshare-code', code);
+      pill($('status'), 'LIVE', true);
       showLink();
     });
     peer.on('connection', (conn) => {
       conn.on('open', () => { conns.set(conn.peer, { conn, call: null }); callViewer(conn.peer); updateCount(); });
       conn.on('close', () => { conns.get(conn.peer)?.call?.close(); conns.delete(conn.peer); updateCount(); });
     });
-    peer.on('disconnected', () => { if (peer && !peer.destroyed) { setTimeout(() => peer && !peer.destroyed && peer.reconnect(), 1500); } });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) { pill($('status'), 'reconnecting…'); setTimeout(() => peer && !peer.destroyed && peer.reconnect(), 1500); } });
     peer.on('error', (err) => {
       if (err.type === 'unavailable-id') { // code taken (e.g. open in another tab) -> new code
         peer.destroy(); code = randomCode(); openPeer();
       } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
+        pill($('status'), 'reconnecting…');
       } else console.warn(err);
     });
   }
