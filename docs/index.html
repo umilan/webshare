@@ -95,7 +95,8 @@ button.big { padding:11px 22px; font-size:16px; }
 #topbar #quality button[aria-checked=true] { background:var(--accent); color:#fff; }
 .prefNote { font-size:12px; color:var(--muted); }
 #topbar .toggle[aria-pressed=true] { color:#fff; background:#1f8f4e; border-color:#1f8f4e; }
-#linkCard { display:inline-flex; gap:10px; align-items:center; }
+#linkCard { display:flex; gap:10px; align-items:center; width:min(100%, 640px); }
+#linkCard button { flex:1; }
 #linkCard[hidden] { display:none; }
 @media (max-width:640px) {
   #topbar #camera { max-width:none; }
@@ -231,7 +232,6 @@ input[type=text] { padding:0 14px; display:block; }
       <button id="transmitBtn" class="primary big">📡 Transmit</button>
     </span>
     <span id="linkCard" hidden>
-      <span class="muted">Code</span> <span id="code" class="code"></span>
       <button id="qrBtn" class="primary" title="Share watch link (QR, copy)">Share</button>
       <span class="muted" title="Viewers">👁 <b id="count">0</b></span>
       <button id="stop" class="danger">Stop</button>
@@ -257,7 +257,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.18.0'; // bump on every published change
+const APP_VERSION = '1.18.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -440,7 +440,6 @@ function startHome() {
   function updateCount() { $('count').textContent = conns.size; }
 
   function showLink() {
-    $('code').textContent = code;
     $('link').textContent = watchUrl(code);
     $('qrCode').textContent = code;
     $('qr').innerHTML = '';
