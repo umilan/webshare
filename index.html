@@ -50,6 +50,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 .seg svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 #topbar .seg button.off { opacity:.4; }
 #toast { position:fixed; left:50%; top:72px; transform:translateX(-50%); z-index:20; width:max-content; max-width:min(92vw, 480px); background:#2a2f3a; color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px 16px; box-shadow:0 10px 30px rgba(0,0,0,.5); font-size:14px; }
+#footer { text-align:center; font-size:11px; color:var(--muted); opacity:.7; padding:4px 0 6px; }
 #linkCard { display:inline-flex; gap:6px; align-items:center; }
 @media (max-width:640px) {
   .wide { display:none; }
@@ -121,6 +122,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
       </div>
     </div>
   </div>
+<footer id="footer">WebShare <span class="ver"></span></footer>
 </div>
 
 <!-- ============ VIEWER ============ -->
@@ -130,6 +132,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
   <div id="bar">
     <span id="vstatus" class="pill">connecting</span>
     <span id="vcode" class="muted"></span>
+    <span class="muted ver" style="font-size:11px;opacity:.7"></span>
     <span class="spacer"></span>
     <button id="unmute" hidden>🔊 Unmute</button>
     <button id="fs">⛶ Fullscreen</button>
@@ -138,6 +141,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 
 <script>
 const $ = (id) => document.getElementById(id);
+const APP_VERSION = '1.7.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -147,6 +151,7 @@ let toastT;
 function toast(text) { const t = $('toast'); t.textContent = text; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 5000); }
 const watchUrl = (code) => `${location.origin}${location.pathname}?watch=${code}`;
 
+document.querySelectorAll('.ver').forEach(e => e.textContent = 'v' + APP_VERSION);
 const watchCode = (new URLSearchParams(location.search).get('watch') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 if (watchCode) startViewer(watchCode); else startHome();
 
