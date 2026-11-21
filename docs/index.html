@@ -273,7 +273,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.21.1'; // bump on every published change
+const APP_VERSION = '1.22.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -475,7 +475,7 @@ function startHome() {
     const h = quality, audio = audioOn;
     const v = $('camera').value;
     if (v === 'file' || v === 'file-new') {
-      if (v === 'file-new' || !currentFile) { currentFile = await pickFile(); await listCameras(); }
+      if (v === 'file-new' || !currentFile || forcePick) { forcePick = false; currentFile = await pickFile(); await listCameras(); }
       $('camera').value = 'file';
       return streamFromFile(currentFile, h, audio);
     }
@@ -521,8 +521,8 @@ function startHome() {
       if (stream && applied != null) {
         $('camera').value = applied; // keep showing what is actually live
         lensId = appliedLens;
-        if (releaseFirst) { try { s = await capture(); } catch (e2) { return stop(); } } else return;
-      } else return;
+        if (releaseFirst) { try { s = await capture(); } catch (e2) { stop(); return false; } } else return false;
+      } else return false;
     }
     if (stream && !releaseFirst) stopStream(stream);
     stream = s; applied = $('camera').value; appliedLens = lensId;
@@ -532,10 +532,23 @@ function startHome() {
     stream.getVideoTracks()[0].onended = stop;
     if (!peer) openPeer();
     else for (const id of conns.keys()) callViewer(id); // send the new stream to every viewer
+    return true;
   }
   // while live, any change of source / quality / audio applies immediately
-  const liveUpdate = () => { if (stream) start(); };
-  $('camera').addEventListener('change', liveUpdate);
+  // choosing Media opens the file dialog right away and starts streaming once a file is picked;
+  // any other source applies immediately while live
+  let forcePick = false, curSel = null;
+  $('camera').addEventListener('focus', () => { curSel = $('camera').value; });
+  $('camera').addEventListener('change', async () => {
+    const v = $('camera').value, prev = curSel || [...$('camera').options].find(o => !o.disabled && !o.value.startsWith('file'))?.value;
+    if (v === 'file' || v === 'file-new') {
+      forcePick = true;
+      const ok = await start();
+      forcePick = false;
+      if (!ok && !stream && prev) $('camera').value = prev; // cancelled before going live -> restore the old choice
+    } else if (stream) await start();
+    curSel = $('camera').value;
+  });
 
   function stop() {
     stopStream(stream);
