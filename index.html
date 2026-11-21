@@ -227,7 +227,7 @@ button.big { padding:11px 22px; font-size:16px; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.17.5'; // bump on every published change
+const APP_VERSION = '1.17.6'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -313,7 +313,7 @@ function startHome() {
       + (canScreen ? '' : '<option value="screen" disabled>🖥️ Screen (computers only)</option>');
     if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
   }
-  $('hint').innerHTML = `<b>Transmit</b> shares your ${canScreen ? 'screen or camera' : 'camera'} (pick the source above), then send the link or QR to whoever should watch.<br><b>Receive</b> watches someone else's stream – scan their QR code or type their code.`;
+  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen or camera' : 'camera'} (pick the source above), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
   listCameras();
 
   async function capture() {
