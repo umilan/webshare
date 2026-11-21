@@ -65,7 +65,8 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #rxModal #rxClose { width:min(92vw, 640px); }
 #rxModal input { font-size:18px; flex:1; min-width:0; }
 #rxModal button { padding:11px 20px; font-size:16px; }
-#idleActions { display:flex; gap:12px; }
+#idleActions { display:flex; gap:10px; width:min(100%, 640px); }
+#idleActions button { flex:1; }
 #idleActions[hidden] { display:none; }
 button.big { padding:11px 22px; font-size:16px; }
 #qrModal button { padding:12px 22px; font-size:16px; }
@@ -226,7 +227,7 @@ button.big { padding:11px 22px; font-size:16px; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.17.4'; // bump on every published change
+const APP_VERSION = '1.17.5'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
