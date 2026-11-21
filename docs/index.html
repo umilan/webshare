@@ -31,10 +31,13 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #preview { max-width:100%; max-height:100%; background:#000; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
 #idle { text-align:center; color:var(--muted); }
 #idle .row { display:flex; gap:8px; justify-content:center; margin-top:12px; }
-#qrPop { position:absolute; right:12px; top:calc(100% + 8px); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; width:220px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
-#qr { background:#fff; padding:10px; border-radius:8px; width:max-content; margin:0 auto; }
-#qr img, #qr canvas { display:block; }
-#link { display:block; margin-top:8px; font-size:12px; word-break:break-all; color:var(--muted); user-select:all; }
+#qrModal { position:fixed; inset:0; z-index:10; background:rgba(8,9,12,.94); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:20px; }
+#qr { background:#fff; padding:16px; border-radius:16px; width:min(86vw, 62vh, 560px); }
+#qr img, #qr canvas { display:block; width:100% !important; height:auto !important; image-rendering:pixelated; }
+#qrCode { font-size:28px; font-weight:800; letter-spacing:.15em; }
+#link { max-width:min(92vw, 640px); text-align:center; font-size:16px; word-break:break-all; color:var(--text); background:#0b0d11; border:1px solid var(--line); border-radius:10px; padding:10px 14px; user-select:all; }
+#qrModal .row { display:flex; gap:10px; }
+#qrModal button { padding:12px 22px; font-size:16px; }
 .spacer { flex:1; }
 #linkCard { display:inline-flex; gap:6px; align-items:center; }
 @media (max-width:640px) {
@@ -81,7 +84,15 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
       <button id="qrBtn" title="Show QR code">QR</button>
       <span class="muted" title="Viewers">👁 <b id="count">0</b></span>
     </span>
-    <div id="qrPop" hidden><div id="qr"></div><span id="link"></span></div>
+  </div>
+  <div id="qrModal" hidden role="dialog" aria-modal="true" aria-label="Watch link QR code">
+    <div id="qrCode"></div>
+    <div id="qr"></div>
+    <div id="link"></div>
+    <div class="row">
+      <button id="qrCopy" class="primary">Copy link</button>
+      <button id="qrClose">Close</button>
+    </div>
   </div>
   <div id="stage">
     <video id="preview" autoplay muted playsinline hidden></video>
@@ -175,7 +186,7 @@ function startHome() {
 
   function stop() {
     if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = null; $('preview').srcObject = null; $('preview').hidden = true; $('idle').hidden = false; $('qrPop').hidden = true;
+    stream = null; $('preview').srcObject = null; $('preview').hidden = true; $('idle').hidden = false; $('qrModal').hidden = true;
     for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
     conns.clear(); updateCount();
     if (peer) { peer.destroy(); peer = null; }
@@ -216,16 +227,29 @@ function startHome() {
   function showLink() {
     $('code').textContent = code;
     $('link').textContent = watchUrl(code);
+    $('qrCode').textContent = code;
     $('qr').innerHTML = '';
-    if (window.QRCode) new QRCode($('qr'), { text: watchUrl(code), width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
+    if (window.QRCode) new QRCode($('qr'), { text: watchUrl(code), width: 512, height: 512, correctLevel: QRCode.CorrectLevel.M });
     $('linkCard').hidden = false;
   }
 
   $('start').onclick = start;
   $('stop').onclick = stop;
-  $('qrBtn').onclick = (e) => { e.stopPropagation(); $('qrPop').hidden = !$('qrPop').hidden; };
-  document.addEventListener('click', (e) => { if (!$('qrPop').contains(e.target)) $('qrPop').hidden = true; });
-  $('copy').onclick = () => navigator.clipboard?.writeText(watchUrl(code)).then(() => { $('copy').textContent = '✓'; setTimeout(() => $('copy').textContent = 'Copy', 1500); });
+  async function copyLink(btn, label) {
+    const url = watchUrl(code);
+    try { await navigator.clipboard.writeText(url); }
+    catch (e) { // fallback for browsers without async clipboard
+      const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select();
+      document.execCommand('copy'); t.remove();
+    }
+    btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = label, 1500);
+  }
+  $('copy').onclick = () => copyLink($('copy'), 'Copy');
+  $('qrCopy').onclick = () => copyLink($('qrCopy'), 'Copy link');
+  $('qrBtn').onclick = () => { $('qrModal').hidden = false; };
+  $('qrClose').onclick = () => { $('qrModal').hidden = true; };
+  $('qrModal').onclick = (e) => { if (e.target === $('qrModal')) $('qrModal').hidden = true; };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('qrModal').hidden = true; });
   const join = () => { const c = $('joinCode').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c) location.href = watchUrl(c); };
   $('join').onclick = join;
   $('joinCode').onkeydown = (e) => { if (e.key === 'Enter') join(); };
