@@ -225,6 +225,26 @@ input[type=text] { padding:0 14px; display:block; }
 #appHeader { display:flex; align-items:baseline; justify-content:center; gap:8px; padding:10px 12px 2px; }
 #appHeader .appName { font-size:22px; font-weight:700; letter-spacing:.01em; }
 #appHeader .ver { font-size:13px; color:var(--muted); }
+
+/* ---- grouped source switch */
+#srcSeg { flex:1; min-width:0; display:flex; gap:3px; padding:3px; height:var(--h); box-sizing:border-box; background:#0b0d11; border:1px solid var(--line); border-radius:var(--r); }
+#topbar #srcSeg button { flex:1 1 0; min-width:0; height:100%; padding:0 6px; border:0; border-radius:var(--r-in); background:transparent; color:var(--muted); font-size:15px; gap:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#topbar #srcSeg button[aria-checked=true] { background:var(--accent); color:#fff; font-weight:600; }
+@media (hover:hover) { #topbar #srcSeg button:not([aria-checked=true]):hover { background:#1b2030; color:var(--text); } }
+@media (max-width:400px) { #topbar #srcSeg button { font-size:14px; padding:0 4px; } }
+/* ---- info button in the preview corner */
+#infoBtn { position:absolute; top:18px; right:18px; z-index:4; width:38px; height:38px; padding:0; border-radius:50%; background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.18); color:#fff; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+#infoBtn svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+#infoBtn[aria-expanded=true] { background:var(--accent); border-color:var(--accent); }
+#infoPop { position:absolute; top:64px; right:18px; z-index:4; width:min(340px, calc(100% - 36px)); padding:14px 16px; border-radius:12px; background:rgba(24,27,34,.96); border:1px solid var(--line); box-shadow:0 10px 30px rgba(0,0,0,.5); color:var(--text); font-size:14px; line-height:1.5; transform-origin:top right; }
+#infoPop[hidden] { display:none; }
+#infoPop p { margin:0; }
+#infoPop.anim-in { animation:dropIn .16s ease-out both; }
+#infoPop.anim-out { animation:dropOut .14s ease-in both; }
+/* ---- stronger Receive button */
+#receiveBtn { background:#2a3344; border-color:#3b475e; color:#fff; font-weight:600; }
+@media (hover:hover) { #receiveBtn:hover { background:#323d52; } }
+#status:not(.live) { background:rgba(0,0,0,.55); }
 </style>
 </head>
 <body>
@@ -264,18 +284,19 @@ input[type=text] { padding:0 14px; display:block; }
     </div>
     <div id="idle">
       <div style="font-size:42px">📡</div>
-      <p id="hint"></p>
+      <p>Pick a source below to see a preview.</p>
     </div>
+    <button type="button" id="infoBtn" aria-label="How it works" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".6"/></svg></button>
+    <div id="infoPop" hidden role="dialog" aria-label="How it works"><p id="hint"></p></div>
   </div>
 
   <footer id="footer">
   <div id="topbar">
       <div id="srcWrap">
         <!-- the native select only holds the state; iOS gives no user-activation to its change event,
-             so a custom menu is used to open the file dialog straight from the tap on "Media" -->
+             so a custom switch is used to open the file dialog straight from the tap on "Media" -->
         <select id="camera" tabindex="-1" aria-hidden="true"></select>
-        <button type="button" id="srcBtn" aria-haspopup="listbox" aria-expanded="false" title="Source"><span id="srcLabel"></span><svg viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1.5l5 5 5-5"/></svg></button>
-        <div id="srcMenu" role="listbox" hidden></div>
+        <div id="srcSeg" class="srcSeg" role="radiogroup" aria-label="Source"></div>
       </div>
       <span class="prefsWrap">
         <button type="button" id="prefsBtn" title="Preferences" aria-label="Preferences" aria-haspopup="true" aria-expanded="false">
@@ -322,7 +343,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.24.2'; // bump on every published change
+const APP_VERSION = '1.25.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -504,26 +525,23 @@ function startHome() {
   const sel = $('camera');
   const selValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
   Object.defineProperty(sel, 'value', { get() { return selValue.get.call(this); }, set(v) { selValue.set.call(this, v); renderSrc(); } });
+  const shortLabel = (o) => ({ environment: '📷 Rear', user: '🤳 Front', file: '🖼️ Media', screen: '🖥️ Screen', camera: '🎥 Camera' }[o.value] || o.textContent);
   function renderSrc() {
-    const o = sel.selectedOptions[0];
-    $('srcLabel').textContent = o ? o.textContent : '';
-    $('srcMenu').innerHTML = [...sel.options].map((x, i) =>
-      `<button type="button" role="option" data-i="${i}" aria-selected="${x.selected}" ${x.disabled ? 'aria-disabled="true"' : ''}>${esc(x.textContent)}</button>`).join('');
+    const opts = [...sel.options].filter(o => !o.disabled && o.value !== 'file-new');
+    const cams = opts.filter(o => !['environment', 'user', 'file', 'screen', 'camera'].includes(o.value));
+    $('srcSeg').innerHTML = opts.map(o => {
+      const label = cams.includes(o) ? (cams.length > 1 ? `🎥 Camera ${cams.indexOf(o) + 1}` : '🎥 Camera') : shortLabel(o);
+      return `<button type="button" role="radio" data-v="${esc(o.value)}" aria-checked="${o.selected}" title="${esc(o.textContent)}">${esc(label)}</button>`;
+    }).join('');
   }
-  const srcOpen = (open) => { open ? showEl($('srcMenu')) : hideEl($('srcMenu')); $('srcBtn').setAttribute('aria-expanded', open); };
-  $('srcBtn').onclick = (e) => { e.stopPropagation(); srcOpen(!isOpen($('srcMenu'))); };
-  $('srcMenu').addEventListener('click', (e) => {
+  $('srcSeg').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.getAttribute('aria-disabled') === 'true') { srcOpen(false); return toast('Phone browsers can\'t share the screen – open this page on a computer to share its screen.'); }
-    e.stopPropagation(); srcOpen(false);
-    const o = sel.options[+b.dataset.i];
-    if (o.selected && !o.value.startsWith('file')) return;      // same camera/screen: nothing to do
+    const v = b.dataset.v;
+    if (sel.value === v && !v.startsWith('file') && stream) return;  // already showing it
     curSel = sel.value;
-    sel.value = o.value;
-    sel.dispatchEvent(new Event('change'));                     // runs synchronously inside this tap
+    sel.value = v;
+    sel.dispatchEvent(new Event('change'));                         // runs synchronously inside this tap
   });
-  document.addEventListener('click', (e) => { if (isOpen($('srcMenu')) && !$('srcWrap').contains(e.target)) srcOpen(false); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen($('srcMenu'))) srcOpen(false); });
 
   async function listCameras() {
     const cur = $('camera').value;
@@ -547,10 +565,17 @@ function startHome() {
     $('camera').innerHTML = opts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
       + (canScreen ? '' : '<option value="screen" disabled>🖥️ Screen (computers only)</option>');
     if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
+    else if (cur === 'camera') { // generic camera became named devices after permission -> keep a camera selected
+      const named = opts.find(([v]) => !['screen', 'file', 'file-new'].includes(v));
+      if (named) { $('camera').value = named[0]; if (applied === 'camera') applied = named[0]; }
+    }
     renderSrc();
   }
   $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen, camera' : 'camera'} or media from your gallery (pick the source below), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
-  listCameras();
+  listCameras().then(() => {
+    const cam = [...sel.options].find(o => !o.disabled && !['screen', 'file', 'file-new'].includes(o.value));
+    if (cam) { sel.value = cam.value; curSel = cam.value; start(); }
+  });
 
   async function capture() {
     const h = quality, audio = audioOn;
@@ -589,6 +614,8 @@ function startHome() {
   new ResizeObserver(() => { const v = $('preview'); if (v && v.srcObject) { v.style.width = '99.9%'; requestAnimationFrame(() => { v.style.width = ''; }); } }).observe($('previewWrap'));
   let applied = null; // source value of the running stream
   let appliedLens = null;
+  let broadcasting = false;
+  // start / switch the local preview (and, while broadcasting, send it to every viewer)
   async function start() {
     const value = $('camera').value;
     if (value !== 'environment') lensId = null; // lens choice only applies to the rear camera
@@ -600,24 +627,47 @@ function startHome() {
     catch (e) {
       if (e.name !== 'NotAllowedError') toast(e.message || String(e));
       if (stream && applied != null) {
-        $('camera').value = applied; // keep showing what is actually live
+        $('camera').value = applied; // keep showing what is actually running
         lensId = appliedLens;
-        if (releaseFirst) { try { s = await capture(); } catch (e2) { stop(); return false; } } else return false;
-      } else return false;
+        if (releaseFirst) { try { s = await capture(); } catch (e2) { endAll(); return false; } } else return false;
+      } else { if (!stream) showIdle(); return false; }
     }
     if (stream && !releaseFirst) stopStream(stream);
     stream = s; applied = $('camera').value; appliedLens = lensId;
-    renderZoom();
+    renderZoom(); renderSrc();
     $('previewWrap').classList.toggle('contain', applied === 'screen' || applied === 'file');
-    showPreview(stream); $('previewWrap').hidden = false; $('idle').hidden = true; $('idleActions').hidden = true;
-    stream.getVideoTracks()[0].onended = stop;
-    if (!peer) openPeer();
+    showPreview(stream); $('previewWrap').hidden = false; $('idle').hidden = true;
+    stream.getVideoTracks()[0].onended = endAll; // e.g. screen sharing stopped from the browser bar
+    if (!broadcasting) pill($('status'), 'PREVIEW');
     else for (const id of conns.keys()) callViewer(id); // send the new stream to every viewer
     return true;
   }
-  // while live, any change of source / quality / audio applies immediately
-  // choosing Media opens the file dialog right away and starts streaming once a file is picked;
-  // any other source applies immediately while live
+  function showIdle() { $('previewWrap').hidden = true; $('idle').hidden = false; $('zoom').hidden = true; }
+  // drop the preview completely (no source running)
+  function clearPreview() {
+    stopStream(stream); stream = null; applied = null; appliedLens = null;
+    $('preview').srcObject = null; showIdle();
+  }
+  // Transmit: broadcast whatever is in the preview (start a preview first if needed)
+  async function goLive() {
+    if (!stream && !(await start())) return;
+    broadcasting = true;
+    $('idleActions').hidden = true;
+    pill($('status'), 'connecting…');
+    if (!peer) openPeer(); else showLink();
+  }
+  // Stop: end the broadcast but keep the preview running
+  function stop() {
+    broadcasting = false;
+    for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
+    conns.clear(); updateCount();
+    if (peer) { peer.destroy(); peer = null; }
+    hideEl($('qrModal')); $('linkCard').hidden = true; $('idleActions').hidden = false;
+    pill($('status'), 'PREVIEW');
+  }
+  function endAll() { if (broadcasting) stop(); clearPreview(); }
+
+  // choosing a source shows it right away; Media opens the file dialog straight from the tap
   let forcePick = false, curSel = null;
   $('camera').addEventListener('change', async () => {
     renderSrc();
@@ -626,25 +676,17 @@ function startHome() {
       forcePick = true;
       const ok = await start();
       forcePick = false;
-      if (!ok && !stream && prev) $('camera').value = prev; // cancelled before going live -> restore the old choice
-    } else if (stream) await start();
+      if (!ok && !stream && prev) $('camera').value = prev; // cancelled with nothing running -> restore the old choice
+    } else await start();
     curSel = $('camera').value; renderSrc();
   });
-
-  function stop() {
-    stopStream(stream);
-    stream = null; $('preview').srcObject = null; $('previewWrap').hidden = true; pill($('status'), 'connecting…'); $('idle').hidden = false; $('idleActions').hidden = false; hideEl($('qrModal'));
-    for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
-    conns.clear(); updateCount();
-    if (peer) { peer.destroy(); peer = null; }
-    applied = null; appliedLens = null; $('zoom').hidden = true; $('linkCard').hidden = true;
-  }
 
   function openPeer() {
     pill($('status'), 'connecting…');
     peer = new Peer(PREFIX + code);
     peer.on('open', () => {
       store.set('webshare-code', code);
+      if (!broadcasting) return;
       pill($('status'), 'LIVE', true);
       showLink();
     });
@@ -700,9 +742,12 @@ function startHome() {
   $('qrBtn').onclick = () => showEl($('qrModal'));
   $('qrClose').onclick = () => hideEl($('qrModal'));
   $('qrModal').onclick = (e) => { if (e.target === $('qrModal')) hideEl($('qrModal')); };
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { hideEl($('qrModal')); if (isOpen($('rxModal'))) closeRx(); } });
-  const join = () => { const c = $('joinCode').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c) { closeRx(); location.href = watchUrl(c); } };
-  $('transmitBtn').onclick = start;
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { hideEl($('qrModal')); if (isOpen($('rxModal'))) closeRx(); if (isOpen($('infoPop'))) infoOpen(false); } });
+  const join = () => { const c = $('joinCode').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c) { closeRx(false); location.href = watchUrl(c); } };
+  $('transmitBtn').onclick = goLive;
+  const infoOpen = (open) => { open ? showEl($('infoPop')) : hideEl($('infoPop')); $('infoBtn').setAttribute('aria-expanded', open); };
+  $('infoBtn').onclick = (e) => { e.stopPropagation(); infoOpen(!isOpen($('infoPop'))); };
+  document.addEventListener('click', (e) => { if (isOpen($('infoPop')) && !$('infoPop').contains(e.target)) infoOpen(false); });
 
   // ---- Receive: code input + QR scanner (BarcodeDetector where available, jsQR fallback e.g. on iPhone)
   let scanStream = null, scanTimer = null, detector = null;
@@ -717,7 +762,9 @@ function startHome() {
     const t = String(text).trim().toUpperCase();
     return /^[A-Z0-9]{4,12}$/.test(t) ? t : null;
   }
+  let resumePreview = false;
   async function openRx() {
+    if (stream && !broadcasting) { resumePreview = true; clearPreview(); }
     showEl($('rxModal')); $('scanBox').classList.remove('hit');
     $('scanMsg').textContent = 'Point the camera at the sharer\'s QR code…';
     try {
@@ -744,7 +791,7 @@ function startHome() {
           const c = text && codeFrom(text);
           if (c) {
             $('scanBox').classList.add('hit'); $('scanMsg').textContent = `Found ${c} – opening…`;
-            closeRx(); location.href = watchUrl(c);
+            closeRx(false); location.href = watchUrl(c);
           } else if (text) $('scanMsg').textContent = 'That QR code is not a WebShare link.';
         } catch (e) {}
         busy = false;
@@ -753,13 +800,14 @@ function startHome() {
       $('scanMsg').textContent = 'Camera not available – type the code instead.';
     }
   }
-  function closeRx() {
+  function closeRx(resume = true) {
     clearInterval(scanTimer); scanTimer = null;
     if (scanStream) scanStream.getTracks().forEach(t => t.stop());
     scanStream = null; $('scan').srcObject = null; hideEl($('rxModal'));
+    if (resume && resumePreview) { resumePreview = false; start(); }
   }
   $('receiveBtn').onclick = openRx;
-  $('rxClose').onclick = closeRx;
+  $('rxClose').onclick = () => closeRx();
   $('join').onclick = join;
   $('joinCode').onkeydown = (e) => { if (e.key === 'Enter') join(); };
 }
