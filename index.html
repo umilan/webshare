@@ -203,38 +203,23 @@ input[type=text] { padding:0 14px; display:block; }
 /* ---- top bar: no background / border, content centred on every screen size */
 #topbar { background:transparent; border-bottom:0; justify-content:center; }
 #topbar .spacer { display:none; }
+
+/* ---- controls row lives in the footer, right above the action buttons */
+#footer #topbar { width:min(100%, 640px); padding:0; gap:8px; flex-wrap:nowrap; z-index:3; }
+#footer #srcWrap { max-width:none; }
+#srcMenu, #prefs { top:auto; bottom:calc(100% + 6px); }
+#srcMenu { transform-origin:bottom left; }
+#prefs { transform-origin:bottom left; }
+@keyframes dropUpIn { from { opacity:0; transform:translateY(6px) scale(.98); } to { opacity:1; transform:none; } }
+@keyframes dropUpOut { from { opacity:1; transform:none; } to { opacity:0; transform:translateY(6px) scale(.98); } }
+#srcMenu.anim-in, #prefs.anim-in { animation:dropUpIn .16s ease-out both; }
+#srcMenu.anim-out, #prefs.anim-out { animation:dropUpOut .14s ease-in both; }
 </style>
 </head>
 <body>
 
 <!-- ============ HOME / SHARE ============ -->
 <div id="home" hidden>
-  <div id="topbar">
-    <span class="brand">📡<span class="wide"> WebShare</span></span>
-    <span class="sep wide"></span>
-    <div id="srcWrap">
-      <!-- the native select only holds the state; iOS gives no user-activation to its change event,
-           so a custom menu is used to open the file dialog straight from the tap on "Media" -->
-      <select id="camera" tabindex="-1" aria-hidden="true"></select>
-      <button type="button" id="srcBtn" aria-haspopup="listbox" aria-expanded="false" title="Source"><span id="srcLabel"></span><svg viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1.5l5 5 5-5"/></svg></button>
-      <div id="srcMenu" role="listbox" hidden></div>
-    </div>
-    <span class="prefsWrap">
-      <button type="button" id="prefsBtn" title="Preferences" aria-label="Preferences" aria-haspopup="true" aria-expanded="false">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
-      <div id="prefs" hidden role="menu">
-        <div class="prefRow"><span>Quality</span>
-          <div id="quality" class="seg">
-            <button type="button" data-q="480">480</button><button type="button" data-q="720">720</button><button type="button" data-q="1080">1080</button>
-          </div>
-        </div>
-        <div class="prefRow"><span>Audio</span>
-          <button type="button" id="audio" class="toggle" aria-pressed="true">On</button>
-        </div>
-        <div class="prefNote">While live, changes apply immediately.</div>
-      </div>
-    </span>
-  </div>
   <div id="toast" hidden role="status"></div>
   <div id="rxModal" class="modal" hidden role="dialog" aria-modal="true" aria-label="Receive a stream">
     <h2>Receive</h2>
@@ -272,6 +257,30 @@ input[type=text] { padding:0 14px; display:block; }
   </div>
 
   <footer id="footer">
+  <div id="topbar">
+      <div id="srcWrap">
+        <!-- the native select only holds the state; iOS gives no user-activation to its change event,
+             so a custom menu is used to open the file dialog straight from the tap on "Media" -->
+        <select id="camera" tabindex="-1" aria-hidden="true"></select>
+        <button type="button" id="srcBtn" aria-haspopup="listbox" aria-expanded="false" title="Source"><span id="srcLabel"></span><svg viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1.5l5 5 5-5"/></svg></button>
+        <div id="srcMenu" role="listbox" hidden></div>
+      </div>
+      <span class="prefsWrap">
+        <button type="button" id="prefsBtn" title="Preferences" aria-label="Preferences" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        <div id="prefs" hidden role="menu">
+          <div class="prefRow"><span>Quality</span>
+            <div id="quality" class="seg">
+              <button type="button" data-q="480">480</button><button type="button" data-q="720">720</button><button type="button" data-q="1080">1080</button>
+            </div>
+          </div>
+          <div class="prefRow"><span>Audio</span>
+            <button type="button" id="audio" class="toggle" aria-pressed="true">On</button>
+          </div>
+          <div class="prefNote">While live, changes apply immediately.</div>
+        </div>
+      </span>
+    </div>
     <span id="idleActions">
       <button id="receiveBtn" class="big">📥 Receive</button>
       <button id="transmitBtn" class="primary big">📡 Transmit</button>
@@ -302,7 +311,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.23.1'; // bump on every published change
+const APP_VERSION = '1.24.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -529,7 +538,7 @@ function startHome() {
     if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
     renderSrc();
   }
-  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen, camera' : 'camera'} or media from your gallery (pick the source above), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
+  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen, camera' : 'camera'} or media from your gallery (pick the source below), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
   listCameras();
 
   async function capture() {
