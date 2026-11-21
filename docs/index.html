@@ -51,6 +51,8 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #topbar .seg button.off { opacity:.4; }
 #toast { position:fixed; left:50%; top:72px; transform:translateX(-50%); z-index:20; width:max-content; max-width:min(92vw, 480px); background:#2a2f3a; color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px 16px; box-shadow:0 10px 30px rgba(0,0,0,.5); font-size:14px; }
 #footer { text-align:center; font-size:11px; color:var(--muted); opacity:.7; padding:4px 0 6px; }
+#topbar select { -webkit-appearance:none; appearance:none; padding-right:26px;
+  background:var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23e8eaf0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center / 10px 7px; }
 #topbar .toggle { color:var(--muted); min-width:5.6em; }
 #topbar .toggle[aria-pressed=true] { color:#fff; background:#1f8f4e; border-color:#1f8f4e; }
 #linkCard { display:inline-flex; gap:6px; align-items:center; }
@@ -58,6 +60,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
   .wide { display:none; }
   #topbar { gap:4px; padding:6px 8px; }
   #topbar button, #topbar select { padding:5px 7px; font-size:13px; }
+  #topbar select { padding-right:24px; background-position:right 8px center; }
   
   #stage { padding:8px; }
 }
@@ -143,7 +146,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.9.0'; // bump on every published change
+const APP_VERSION = '1.9.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
