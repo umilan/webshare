@@ -129,8 +129,6 @@ button.big { padding:11px 22px; font-size:16px; }
         <div class="prefNote">While live, changes apply immediately.</div>
       </div>
     </span>
-    <button id="start" class="primary">Start</button>
-    <button id="stop" class="danger" hidden>Stop</button>
   </div>
   <div id="toast" hidden role="status"></div>
   <div id="rxModal" class="modal" hidden role="dialog" aria-modal="true" aria-label="Receive a stream">
@@ -173,6 +171,7 @@ button.big { padding:11px 22px; font-size:16px; }
       <span class="muted">Code</span> <span id="code" class="code"></span>
       <button id="qrBtn" class="primary" title="Share watch link (QR, copy)">Share</button>
       <span class="muted" title="Viewers">👁 <b id="count">0</b></span>
+      <button id="stop" class="danger">Stop</button>
     </span>
     <span class="verText">WebShare <span class="ver"></span></span>
   </footer>
@@ -194,7 +193,7 @@ button.big { padding:11px 22px; font-size:16px; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.15.1'; // bump on every published change
+const APP_VERSION = '1.16.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -302,7 +301,6 @@ function startHome() {
     $('previewWrap').classList.toggle('contain', applied === 'screen');
     $('preview').srcObject = stream; $('previewWrap').hidden = false; $('idle').hidden = true; $('idleActions').hidden = true;
     stream.getVideoTracks()[0].onended = stop;
-    $('start').hidden = true; $('stop').hidden = false;
     if (!peer) openPeer();
     else for (const id of conns.keys()) callViewer(id); // send the new stream to every viewer
   }
@@ -316,7 +314,7 @@ function startHome() {
     for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
     conns.clear(); updateCount();
     if (peer) { peer.destroy(); peer = null; }
-    $('start').hidden = false; $('stop').hidden = true; applied = null; $('linkCard').hidden = true;
+    applied = null; $('linkCard').hidden = true;
   }
 
   function openPeer() {
@@ -358,7 +356,6 @@ function startHome() {
     $('linkCard').hidden = false;
   }
 
-  $('start').onclick = start;
   $('stop').onclick = stop;
   async function copyLink(btn, label) {
     const url = watchUrl(code);
