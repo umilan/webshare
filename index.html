@@ -273,7 +273,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.21.0'; // bump on every published change
+const APP_VERSION = '1.21.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -461,14 +461,14 @@ function startHome() {
     }
     // photo / video from the gallery sits next to Screen
     const fileOpts = currentFile
-      ? [['file', '🖼️ ' + currentFile.name], ['file-new', '📂 Choose another photo / video…']]
-      : [['file', '🖼️ Photo / video from gallery']];
+      ? [['file', '🖼️ Media'], ['file-new', '📂 Other media…']]
+      : [['file', '🖼️ Media']];
     if (canScreen) opts.splice(1, 0, ...fileOpts); else opts.push(...fileOpts);
     $('camera').innerHTML = opts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
       + (canScreen ? '' : '<option value="screen" disabled>🖥️ Screen (computers only)</option>');
     if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
   }
-  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen, camera' : 'camera'} or a photo / video from your gallery (pick the source above), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
+  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen, camera' : 'camera'} or media from your gallery (pick the source above), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
   listCameras();
 
   async function capture() {
