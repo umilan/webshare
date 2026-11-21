@@ -245,6 +245,14 @@ input[type=text] { padding:0 14px; display:block; }
 #receiveBtn { background:#2a3344; border-color:#3b475e; color:#fff; font-weight:600; }
 @media (hover:hover) { #receiveBtn:hover { background:#323d52; } }
 #status:not(.live) { background:rgba(0,0,0,.55); }
+
+/* ---- grouped switch: neutral white selection + responsive labels */
+#srcSeg { container-type:inline-size; }
+#topbar #srcSeg button[aria-checked=true] { background:#f2f3f5; color:#111418; font-weight:600; }
+#srcSeg .lbl { overflow:hidden; text-overflow:ellipsis; }
+#srcSeg .lbl.m, #srcSeg .lbl.s { display:none; }
+@container (max-width: 430px) { #srcSeg .lbl.l { display:none; } #srcSeg .lbl.m { display:inline; } }
+@container (max-width: 270px) { #srcSeg .lbl.m { display:none; } #srcSeg .lbl.s { display:inline; } }
 </style>
 </head>
 <body>
@@ -343,7 +351,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.25.0'; // bump on every published change
+const APP_VERSION = '1.25.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -525,13 +533,26 @@ function startHome() {
   const sel = $('camera');
   const selValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
   Object.defineProperty(sel, 'value', { get() { return selValue.get.call(this); }, set(v) { selValue.set.call(this, v); renderSrc(); } });
-  const shortLabel = (o) => ({ environment: '📷 Rear', user: '🤳 Front', file: '🖼️ Media', screen: '🖥️ Screen', camera: '🎥 Camera' }[o.value] || o.textContent);
+  // three label lengths, picked by the switch's own width (container query): long / mid / short
+  function labels(o, cams) {
+    const i = cams.indexOf(o), n = cams.length > 1 ? ' ' + (i + 1) : '';
+    switch (o.value) {
+      case 'environment': return ['📷', 'Rear camera', 'Rear cam', 'Rear'];
+      case 'user': return ['🤳', 'Front camera', 'Front cam', 'Front'];
+      case 'file': return ['🖼️', 'Media', 'Media', 'Media'];
+      case 'screen': return ['🖥️', 'Screen', 'Screen', 'Screen'];
+      case 'camera': return ['🤳', 'Front camera', 'Front cam', 'Front'];
+      default: // computer webcams: the (first) built-in one faces the user; the full device name is in the tooltip
+        return i <= 0 ? ['🤳', 'Front camera', 'Front cam', 'Front'] : ['🎥', 'Camera' + n, 'Cam' + n, 'Cam' + n];
+    }
+  }
   function renderSrc() {
     const opts = [...sel.options].filter(o => !o.disabled && o.value !== 'file-new');
     const cams = opts.filter(o => !['environment', 'user', 'file', 'screen', 'camera'].includes(o.value));
     $('srcSeg').innerHTML = opts.map(o => {
-      const label = cams.includes(o) ? (cams.length > 1 ? `🎥 Camera ${cams.indexOf(o) + 1}` : '🎥 Camera') : shortLabel(o);
-      return `<button type="button" role="radio" data-v="${esc(o.value)}" aria-checked="${o.selected}" title="${esc(o.textContent)}">${esc(label)}</button>`;
+      const [ico, l, m, sh] = labels(o, cams);
+      return `<button type="button" role="radio" data-v="${esc(o.value)}" aria-checked="${o.selected}" title="${esc(o.textContent)}" aria-label="${esc(l)}">`
+        + `<span class="ico">${ico}</span><span class="lbl l">${esc(l)}</span><span class="lbl m">${esc(m)}</span><span class="lbl s">${esc(sh)}</span></button>`;
     }).join('');
   }
   $('srcSeg').addEventListener('click', (e) => {
