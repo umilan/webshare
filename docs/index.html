@@ -47,8 +47,6 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 .seg { display:inline-flex; background:#0b0d11; border:1px solid var(--line); border-radius:9px; padding:2px; gap:2px; }
 #topbar .seg button { border:0; background:transparent; padding:5px 10px; border-radius:7px; color:var(--muted); display:flex; }
 #topbar .seg button[aria-checked=true] { background:var(--accent); color:#fff; }
-.seg svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-#topbar .seg button.off { opacity:.4; }
 #toast { position:fixed; left:50%; top:72px; transform:translateX(-50%); z-index:20; width:max-content; max-width:min(92vw, 480px); background:#2a2f3a; color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px 16px; box-shadow:0 10px 30px rgba(0,0,0,.5); font-size:14px; }
 #footer { text-align:center; font-size:11px; color:var(--muted); opacity:.7; padding:4px 0 6px; }
 #topbar select { -webkit-appearance:none; appearance:none; padding-right:26px;
@@ -94,13 +92,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
   <div id="topbar">
     <span class="brand">📡<span class="wide"> WebShare</span></span>
     <span class="sep wide"></span>
-    <div id="source" class="seg" role="radiogroup" aria-label="Source">
-      <button type="button" data-v="screen" role="radio" aria-checked="true" title="Screen" aria-label="Screen">
-        <svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
-      <button type="button" data-v="camera" role="radio" aria-checked="false" title="Camera" aria-label="Camera">
-        <svg viewBox="0 0 24 24"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.8l1.4-2h6.6l1.4 2h1.8A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="12.5" r="3.6"/></svg></button>
-    </div>
-    <select id="camera" hidden title="Camera"></select>
+    <select id="camera" title="Source" aria-label="Source"></select>
     <span class="prefsWrap">
       <button type="button" id="prefsBtn" title="Preferences" aria-label="Preferences" aria-haspopup="true" aria-expanded="false">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -169,7 +161,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.10.1'; // bump on every published change
+const APP_VERSION = '1.11.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -191,13 +183,6 @@ function startHome() {
   let stream = null, peer = null, code = store.get('webshare-code') || randomCode();
   const conns = new Map(); // viewerPeerId -> { conn, call }
 
-  let source = 'screen';
-  function setSource(v) {
-    source = v;
-    $('source').querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', b.dataset.v === v));
-    $('camera').hidden = v !== 'camera';
-    if (v === 'camera') listCameras();
-  }
   // ---- preferences (quality + audio), remembered per browser
   let quality = +(store.get('webshare-quality') || 1080);
   let audioOn = store.get('webshare-audio') !== 'off'; // audio on by default
@@ -219,41 +204,46 @@ function startHome() {
   $('prefsBtn').onclick = (e) => { e.stopPropagation(); togglePrefs($('prefs').hidden); };
   document.addEventListener('click', (e) => { if (!$('prefs').hidden && !$('prefs').contains(e.target)) togglePrefs(false); });
   renderPrefs();
-  let screenUnsupported = false;
-  $('source').querySelectorAll('button').forEach(b => b.onclick = () => {
-    if (b.dataset.v === 'screen' && screenUnsupported)
-      return toast('Phone browsers can\'t share the screen – Apple and Google block it. Open this page on a computer to share its screen, or use the camera here.');
-    setSource(b.dataset.v);
-  });
+  // ---- source picker: screen + cameras in one dropdown
   // phones/tablets can't share the screen (iOS even exposes getDisplayMedia but it always fails)
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (isMobile || !navigator.mediaDevices?.getDisplayMedia) {
-    screenUnsupported = true;
-    $('source').querySelector('[data-v=screen]').classList.add('off');
-    $('hint').innerHTML = 'Pick <b>Rear</b> or <b>Front</b> camera and press <b>Start</b>.';
-    setSource('camera');
-  }
-
+  const canScreen = !isMobile && !!navigator.mediaDevices?.getDisplayMedia;
+  // readable labels, e.g. iPhone "Back Ultra Wide Camera" -> "Rear Ultra Wide camera", Android "camera2 0, facing back" -> "Rear camera"
+  const nice = (l, i) => {
+    const base = (l || '').replace(/^.*facing (front|back).*$/i, '$1').replace(/\s*\(.*?\)/g, '').replace(/\bcamera\b/ig, '')
+      .replace(/\bback\b/ig, 'Rear').replace(/\bfront\b/ig, 'Front').replace(/\s+/g, ' ').trim();
+    return base ? `${base} camera` : `Camera ${i + 1}`;
+  };
   async function listCameras() {
-    try {
-      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
-      const cur = $('camera').value;
-      // short labels: "Front" / "Rear" (no "camera" word); e.g. iPhone "Back Ultra Wide Camera" -> "Rear Ultra Wide"
-      const short = (l, i) => (l || `Cam ${i + 1}`).replace(/^.*facing (front|back).*$/i, '$1').replace(/\s*\(.*?\)/g, '').replace(/\bcamera\b/ig, '').replace(/\bback\b/ig, 'Rear').replace(/\s+/g, ' ').trim() || `Cam ${i + 1}`;
-      const extra = devs.filter(d => d.deviceId).map((d, i) => [d.deviceId, short(d.label, i)]).filter(([, l]) => !/^(front|rear)$/i.test(l));
-      $('camera').innerHTML = '<option value="environment">Rear</option><option value="user">Front</option>'
-        + extra.map(([id, l]) => `<option value="${id}">${l}</option>`).join('');
-      if (cur) $('camera').value = cur;
-    } catch (e) {}
+    const cur = $('camera').value;
+    let devs = [];
+    try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && d.deviceId); } catch (e) {}
+    const opts = [];
+    const screenOpt = canScreen ? ['screen', 'Screen'] : null;
+    if (screenOpt) opts.push(screenOpt);
+    if (isMobile) {
+      opts.push(['environment', 'Rear camera'], ['user', 'Front camera']);
+      devs.forEach((d, i) => { const l = nice(d.label, i); if (!/^(front|rear) camera$/i.test(l)) opts.push([d.deviceId, l]); });
+    } else {
+      const named = devs.filter(d => d.label);
+      if (named.length) named.forEach((d, i) => opts.push([d.deviceId, nice(d.label, i)]));
+      else opts.push(['camera', 'Camera']);
+    }
+    $('camera').innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')
+      + (canScreen ? '' : '<option value="screen" disabled>Screen (computers only)</option>');
+    if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
   }
+  if (!canScreen) $('hint').innerHTML = 'Pick a camera above and press <b>Start</b>.';
+  else $('hint').innerHTML = 'Pick <b>Screen</b> or a camera above and press <b>Start</b>.';
+  listCameras();
 
   async function capture() {
     const h = quality, audio = audioOn;
-    if (source === 'screen')
+    if ($('camera').value === 'screen')
       return navigator.mediaDevices.getDisplayMedia({ video: { height: { ideal: h }, frameRate: { ideal: 30 } }, audio });
     const cam = $('camera').value || 'environment';
     const video = { height: { ideal: h } };
-    if (cam === 'user' || cam === 'environment') video.facingMode = cam; else video.deviceId = { exact: cam };
+    if (cam === 'user' || cam === 'environment') video.facingMode = cam; else if (cam !== 'camera') video.deviceId = { exact: cam };
     const s = await navigator.mediaDevices.getUserMedia({ video, audio });
     listCameras();
     return s;
