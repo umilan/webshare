@@ -257,7 +257,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.18.1'; // bump on every published change
+const APP_VERSION = '1.18.2'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -332,8 +332,8 @@ function startHome() {
     const screenOpt = canScreen ? ['screen', '🖥️ Screen'] : null;
     if (screenOpt) opts.push(screenOpt);
     if (isMobile) {
+      // keep it simple on phones: just rear / front (the OS picks the best lens)
       opts.push(['environment', '📷 Rear camera'], ['user', '🤳 Front camera']);
-      devs.forEach((d, i) => { const l = nice(d.label, i); if (!/^(front|rear) camera$/i.test(l)) opts.push([d.deviceId, (/^front/i.test(l) ? '🤳 ' : '📷 ') + l]); });
     } else {
       const named = devs.filter(d => d.label);
       if (named.length) named.forEach((d, i) => opts.push([d.deviceId, '🎥 ' + nice(d.label, i)]));
