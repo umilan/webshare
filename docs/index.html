@@ -34,18 +34,10 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #status.live { background:var(--bad); }
 #status.live::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:#fff; margin-right:5px; vertical-align:1px; animation:blink 1.4s infinite; }
 @keyframes blink { 50% { opacity:.25; } }
-#idle { width:100%; max-width:760px; max-height:100%; overflow:auto; text-align:center; color:var(--muted); }
-#idle h2 { color:var(--text); font-size:20px; margin:0 0 14px; }
-.choices { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-@media (max-width:640px) { .choices { grid-template-columns:1fr; } }
-.choice { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px 16px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-.choice .ico { font-size:34px; line-height:1; }
-.choice h3 { margin:0; color:var(--text); font-size:17px; }
-.choice p { margin:0; font-size:14px; }
-.choice ol { margin:0; padding-left:20px; text-align:left; font-size:13px; }
-.choice .row { display:flex; gap:8px; justify-content:center; margin-top:4px; }
-button.big { padding:10px 20px; font-size:15px; }
-#idle .fine { font-size:12px; margin:14px 0 0; }
+#idle { text-align:center; color:var(--muted); }
+#idle p { margin:6px 0; }
+#idle b { color:var(--text); }
+#idle .row { display:flex; gap:8px; justify-content:center; margin-top:12px; }
 #qrModal { position:fixed; inset:0; z-index:10; background:rgba(8,9,12,.94); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:20px; }
 #qr { background:#fff; padding:16px; border-radius:16px; width:min(86vw, 62vh, 560px); }
 #qr img, #qr canvas { display:block; width:100% !important; height:auto !important; image-rendering:pixelated; }
@@ -140,29 +132,13 @@ button.big { padding:10px 20px; font-size:15px; }
       <span id="status" class="pill">connecting…</span>
     </div>
     <div id="idle">
-      <h2>What do you want to do?</h2>
-      <div class="choices">
-        <section class="choice">
-          <div class="ico">📡</div>
-          <h3>Share</h3>
-          <p id="hint">Pick a source in the top bar, then press <b>Start</b>.</p>
-          <ol>
-            <li>Allow camera / screen access.</li>
-            <li>Tap <b>Share</b> at the bottom to send the link, code or QR.</li>
-          </ol>
-          <button id="idleStart" class="primary big">Start sharing</button>
-        </section>
-        <section class="choice">
-          <div class="ico">👀</div>
-          <h3>Watch</h3>
-          <p>Got a link or QR? Just open it. Got a code? Type it here:</p>
-          <div class="row">
-            <input id="joinCode" type="text" placeholder="CODE" maxlength="12" autocomplete="off" autocapitalize="characters">
-            <button id="join" class="big">Watch</button>
-          </div>
-        </section>
+      <div style="font-size:42px">📡</div>
+      <p><b>Share:</b> <span id="hint">pick a source above and press <b>Start</b>.</span></p>
+      <p><b>Watch:</b> open the link / QR you got, or enter the code:</p>
+      <div class="row">
+        <input id="joinCode" type="text" placeholder="CODE" maxlength="12" autocomplete="off" autocapitalize="characters">
+        <button id="join">Watch</button>
       </div>
-      <p class="fine">No app needed – works in any modern browser. Video goes directly between the two devices.</p>
     </div>
   </div>
 
@@ -192,7 +168,7 @@ button.big { padding:10px 20px; font-size:15px; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.14.0'; // bump on every published change
+const APP_VERSION = '1.14.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -264,8 +240,8 @@ function startHome() {
       + (canScreen ? '' : '<option value="screen" disabled>🖥️ Screen (computers only)</option>');
     if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
   }
-  $('hint').innerHTML = canScreen ? 'Pick <b>Screen</b> or a camera in the top bar, then press <b>Start</b>.'
-                                  : 'Pick a camera in the top bar, then press <b>Start</b>.';
+  $('hint').innerHTML = canScreen ? 'pick <b>Screen</b> or a camera above and press <b>Start</b>.'
+                                  : 'pick a camera above and press <b>Start</b>.';
   listCameras();
 
   async function capture() {
@@ -371,7 +347,6 @@ function startHome() {
   }
 
   $('start').onclick = start;
-  $('idleStart').onclick = start;
   $('stop').onclick = stop;
   async function copyLink(btn, label) {
     const url = watchUrl(code);
