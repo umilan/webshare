@@ -273,7 +273,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.19.0'; // bump on every published change
+const APP_VERSION = '1.20.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -356,18 +356,29 @@ function startHome() {
     if (lenses.length && !lenses.some(x => x.zoom === 1)) lenses = [];
     renderZoom();
   }
+  // slider stops: front camera ("−1×") + the rear lenses (or a plain 1× when the lenses are unknown)
+  const stops = () => [{ front: true, label: '−1×' },
+    ...(lenses.length ? lenses : [{ zoom: 1, id: null }]).map(x => ({ ...x, label: x.zoom + '×' }))];
+  function curStop(st) {
+    if (applied === 'user') return 0;
+    const i = st.findIndex(x => !x.front && (lensId ? x.id === lensId : x.zoom === 1));
+    return i < 0 ? 1 : i;
+  }
   function renderZoom() {
-    const show = isMobile && stream && applied === 'environment' && lenses.length >= 2;
+    const show = isMobile && stream && (applied === 'environment' || applied === 'user');
     $('zoom').hidden = !show;
     if (!show) return;
-    const cur = Math.max(0, lenses.findIndex(x => x.id === lensId) >= 0 ? lenses.findIndex(x => x.id === lensId) : lenses.findIndex(x => x.zoom === 1));
-    $('zoomRange').max = lenses.length - 1; $('zoomRange').value = cur;
-    $('zoomLabels').innerHTML = lenses.map((x, i) => `<button type="button" data-i="${i}" class="${i === cur ? 'on' : ''}">${x.zoom}×</button>`).join('');
+    const st = stops(), cur = curStop(st);
+    $('zoomRange').max = st.length - 1; $('zoomRange').value = cur;
+    $('zoomLabels').innerHTML = st.map((x, i) => `<button type="button" data-i="${i}" class="${i === cur ? 'on' : ''}" title="${x.front ? 'Front camera' : 'Rear camera ' + x.label}">${x.label}</button>`).join('');
     $('zoomLabels').querySelectorAll('button').forEach(b => b.onclick = () => setLens(+b.dataset.i));
   }
   async function setLens(i) {
-    const lens = lenses[i]; if (!lens || lens.id === lensId || !stream) return renderZoom();
-    lensId = lens.id; renderZoom();
+    const st = stops(), stop = st[i];
+    if (!stop || !stream || i === curStop(st)) return renderZoom();
+    if (stop.front) { $('camera').value = 'user'; lensId = null; }
+    else { $('camera').value = 'environment'; lensId = stop.zoom === 1 ? null : stop.id; }
+    renderZoom();
     await start();
   }
   $('zoomRange').addEventListener('input', () => {
