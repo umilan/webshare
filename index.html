@@ -48,6 +48,8 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #topbar .seg button { border:0; background:transparent; padding:5px 10px; border-radius:7px; color:var(--muted); display:flex; }
 #topbar .seg button[aria-checked=true] { background:var(--accent); color:#fff; }
 .seg svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+#topbar .seg button.off { opacity:.4; }
+#toast { position:fixed; left:50%; top:72px; transform:translateX(-50%); z-index:20; width:max-content; max-width:min(92vw, 480px); background:#2a2f3a; color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px 16px; box-shadow:0 10px 30px rgba(0,0,0,.5); font-size:14px; }
 #linkCard { display:inline-flex; gap:6px; align-items:center; }
 @media (max-width:640px) {
   .wide { display:none; }
@@ -95,6 +97,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
       <span class="muted" title="Viewers">👁 <b id="count">0</b></span>
     </span>
   </div>
+  <div id="toast" hidden role="status"></div>
   <div id="qrModal" hidden role="dialog" aria-modal="true" aria-label="Watch link QR code">
     <div id="qrCode"></div>
     <div id="qr"></div>
@@ -140,6 +143,8 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const pill = (el, text, live) => { el.textContent = text; el.className = 'pill' + (live ? ' live' : ''); };
+let toastT;
+function toast(text) { const t = $('toast'); t.textContent = text; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 5000); }
 const watchUrl = (code) => `${location.origin}${location.pathname}?watch=${code}`;
 
 const watchCode = (new URLSearchParams(location.search).get('watch') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -160,11 +165,17 @@ function startHome() {
     $('camera').hidden = v !== 'camera';
     if (v === 'camera') listCameras();
   }
-  $('source').querySelectorAll('button').forEach(b => b.onclick = () => setSource(b.dataset.v));
+  let screenUnsupported = false;
+  $('source').querySelectorAll('button').forEach(b => b.onclick = () => {
+    if (b.dataset.v === 'screen' && screenUnsupported)
+      return toast('Phone browsers can\'t share the screen – Apple and Google block it. Open this page on a computer to share its screen, or use the camera here.');
+    setSource(b.dataset.v);
+  });
   // phones/tablets can't share the screen (iOS even exposes getDisplayMedia but it always fails)
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (isMobile || !navigator.mediaDevices?.getDisplayMedia) {
-    $('source').querySelector('[data-v=screen]').hidden = true;
+    screenUnsupported = true;
+    $('source').querySelector('[data-v=screen]').classList.add('off');
     $('hint').innerHTML = 'Pick <b>Front</b> or <b>Rear</b> camera and press <b>Start</b>.';
     setSource('camera');
   }
