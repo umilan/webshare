@@ -255,12 +255,11 @@ input[type=text] { padding:0 14px; display:block; }
 #srcSeg[data-size=xs] .ico { font-size:18px; }
 
 /* ---- text source editor (bottom of the preview) */
-#textEdit { position:absolute; left:8px; right:8px; bottom:8px; z-index:3; }
-#previewWrap.textMode { bottom:calc(8px + var(--textEditH) + 10px); }
-:root { --textEditH:72px; }
-#textEdit[hidden] { display:none; }
-#textInput { box-sizing:border-box; width:100%; height:var(--textEditH); resize:none; padding:11px 14px; font:600 16px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#fff; background:#0b0d11; border:1px solid var(--line); border-radius:var(--r); outline:none; display:block; }
-#textInput:focus { border-color:var(--accent); }
+#textStage { position:absolute; inset:0; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:text; }
+#textStage[hidden] { display:none; }
+#textBox { max-width:90%; max-height:100%; color:#fff; font-weight:700; line-height:1.18; text-align:center; white-space:pre-wrap; overflow-wrap:anywhere; outline:none; caret-color:var(--accent); font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#textBox.empty::before { content:attr(data-ph); color:rgba(255,255,255,.35); }
+#textStage:focus-within { box-shadow:inset 0 0 0 2px var(--accent); }
 </style>
 </head>
 <body>
@@ -292,6 +291,7 @@ input[type=text] { padding:0 14px; display:block; }
   <div id="stage">
     <div id="previewWrap" hidden>
       <video id="preview" autoplay muted playsinline></video>
+      <div id="textStage" hidden><div id="textBox" spellcheck="false" autocapitalize="sentences" role="textbox" aria-multiline="true" aria-label="Text to show – tap to edit" data-ph="Tap to type…"></div></div>
       <span id="status" class="pill">connecting…</span>
       <div id="zoom" hidden>
         <input id="zoomRange" type="range" min="0" max="2" step="1" value="1" aria-label="Zoom (switches lens)">
@@ -302,9 +302,6 @@ input[type=text] { padding:0 14px; display:block; }
       <div style="font-size:42px">📡</div>
       <p>Pick a source below to see a preview.</p>
     </div>
-    <div id="textEdit" hidden>
-        <textarea id="textInput" rows="2" placeholder="Type your text…" aria-label="Text to show" enterkeyhint="done"></textarea>
-      </div>
     <button type="button" id="infoBtn" aria-label="How it works" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".6"/></svg></button>
     <div id="infoPop" hidden role="dialog" aria-label="How it works"><p id="hint"></p></div>
   </div>
@@ -362,7 +359,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.26.0'; // bump on every published change
+const APP_VERSION = '1.27.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -561,7 +558,7 @@ function startHome() {
   function drawText(canvas, ctx, text) {
     const W = canvas.width, H = canvas.height;
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-    text = text.trim(); if (!text) return;
+    text = text.trim(); if (!text) return Math.min(W, H) * 0.08;
     const maxW = W * 0.9, maxH = H * 0.86;
     let lo = 8, hi = Math.floor(Math.min(W, H) * 0.7), best = lo, bestLines = [text];
     while (lo <= hi) { // largest font size where the wrapped text still fits
@@ -575,25 +572,40 @@ function startHome() {
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const lh = best * 1.18, y0 = H / 2 - (bestLines.length - 1) * lh / 2;
     bestLines.forEach((l, i) => ctx.fillText(l, W / 2, y0 + i * lh));
+    return best;
   }
+  // plaintext-only keeps pasted formatting out (fallback to plain contenteditable)
+  const tb = $('textBox');
+  tb.contentEditable = 'plaintext-only'; if (tb.contentEditable !== 'plaintext-only') tb.contentEditable = 'true';
+  const readBox = () => tb.innerText.replace(/\n$/, '');
   function streamFromText(h) {
-    // frame follows the shape of the preview area; shorter side = chosen quality
-    const r = $('stage').getBoundingClientRect(), w = r.width - 16, hh = r.height - 16 - 82; // minus the editor below
+    // frame has the shape of the preview area; shorter side = chosen quality
+    const r = $('stage').getBoundingClientRect(), w = r.width - 16, hh = r.height - 16;
     const aspect = w > 10 && hh > 10 ? w / hh : (innerWidth / innerHeight);
     const k = Math.min(h / Math.min(aspect, 1), 1920 / Math.max(aspect, 1));
     const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
     canvas.width = Math.round(aspect * k) & ~1; canvas.height = Math.round(k) & ~1;
-    const draw = () => drawText(canvas, ctx, textValue);
+    // the preview shows the editable text itself, sized like the streamed frame
+    const fitBox = (best) => { const sc = $('textStage').clientWidth / canvas.width; if (sc > 0) tb.style.fontSize = (best * sc).toFixed(1) + 'px'; };
+    const draw = () => fitBox(drawText(canvas, ctx, textValue));
+    if (readBox() !== textValue) tb.innerText = textValue;
+    tb.classList.toggle('empty', !textValue.trim());
     draw();
-    const timer = setInterval(draw, 250); // keep frames flowing so viewers stay in sync
-    const onInput = () => { textValue = $('textInput').value; store.set('webshare-text', textValue); draw(); };
-    $('textInput').value = textValue;
-    $('textInput').addEventListener('input', onInput);
+    const timer = setInterval(() => drawText(canvas, ctx, textValue), 250); // keep frames flowing for viewers
+    const onInput = () => {
+      textValue = readBox();
+      if (!textValue.trim() && tb.innerHTML) tb.innerHTML = '';   // drop the stray <br> so the placeholder shows
+      tb.classList.toggle('empty', !textValue.trim());
+      store.set('webshare-text', textValue); draw();
+    };
+    tb.addEventListener('input', onInput);
+    const ro = new ResizeObserver(draw); ro.observe($('textStage'));
     const ms = canvas.captureStream(10);
     ms.getVideoTracks().forEach(t => { try { t.contentHint = 'detail'; } catch (e) {} });
-    ms._cleanup = () => { clearInterval(timer); $('textInput').removeEventListener('input', onInput); };
+    ms._cleanup = () => { clearInterval(timer); tb.removeEventListener('input', onInput); ro.disconnect(); };
     return ms;
   }
+  $('textStage').addEventListener('click', (e) => { if (e.target === $('textStage')) tb.focus(); }); // tap anywhere to edit
 
   const stopStream = (st) => { if (!st) return; st.getTracks().forEach(t => t.stop()); st._cleanup?.(); };
 
@@ -738,15 +750,14 @@ function startHome() {
     stream = s; applied = $('camera').value; appliedLens = lensId;
     renderZoom(); renderSrc();
     $('previewWrap').classList.toggle('contain', applied === 'screen' || applied === 'file' || applied === 'text');
-    $('textEdit').hidden = applied !== 'text';
-    $('previewWrap').classList.toggle('textMode', applied === 'text');
+    $('textStage').hidden = applied !== 'text';
     showPreview(stream); $('previewWrap').hidden = false; $('idle').hidden = true;
     stream.getVideoTracks()[0].onended = endAll; // e.g. screen sharing stopped from the browser bar
     if (!broadcasting) pill($('status'), 'PREVIEW');
     else for (const id of conns.keys()) callViewer(id); // send the new stream to every viewer
     return true;
   }
-  function showIdle() { $('textEdit').hidden = true; $('previewWrap').hidden = true; $('idle').hidden = false; $('zoom').hidden = true; }
+  function showIdle() { $('textStage').hidden = true; $('previewWrap').hidden = true; $('idle').hidden = false; $('zoom').hidden = true; }
   // drop the preview completely (no source running)
   function clearPreview() {
     stopStream(stream); stream = null; applied = null; appliedLens = null;
