@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebShare</title>
+<meta name="description" content="Share your camera or screen and watch it in any browser – no app needed.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root { --bg:#0f1115; --panel:#181b22; --line:#2a2f3a; --text:#e8eaf0; --muted:#9aa3b2; --accent:#4f8cff; --bad:#ff5c5c; }
+* { box-sizing:border-box; }
+html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+button, select { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:9px 14px; cursor:pointer; }
+button:hover { border-color:var(--accent); }
+button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+button.danger { background:var(--bad); border-color:var(--bad); color:#fff; font-weight:600; }
+input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1px solid var(--line); border-radius:8px; padding:9px 12px; width:9em; text-transform:uppercase; letter-spacing:.1em; }
+.wrap { max-width:1000px; margin:0 auto; padding:16px; }
+h1 { font-size:22px; margin:4px 0 16px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+.row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.muted { color:var(--muted); }
+.pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:13px; border:1px solid var(--line); vertical-align:middle; }
+.pill.live { background:var(--bad); border-color:var(--bad); color:#fff; font-weight:700; }
+code.link { display:block; background:#0b0d11; border:1px solid var(--line); padding:10px 12px; border-radius:8px; word-break:break-all; user-select:all; font-size:16px; }
+.code { font-size:34px; font-weight:800; letter-spacing:.15em; }
+#qr { background:#fff; padding:10px; border-radius:8px; width:max-content; }
+#qr img, #qr canvas { display:block; }
+video.preview { width:100%; max-height:55vh; background:#000; border-radius:10px; display:block; }
+.grid { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; }
+@media (max-width:640px) { .grid { grid-template-columns:1fr; } }
+/* viewer */
+#viewer { position:fixed; inset:0; background:#000; display:flex; align-items:center; justify-content:center; }
+#viewer video { width:100%; height:100%; object-fit:contain; }
+#vmsg { position:absolute; text-align:center; color:var(--muted); padding:20px; }
+#bar { position:fixed; left:0; right:0; bottom:0; padding:12px 16px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:linear-gradient(transparent,rgba(0,0,0,.8)); transition:opacity .3s; }
+#bar.hide { opacity:0; pointer-events:none; }
+.spacer { flex:1; }
+[hidden] { display:none !important; }
+</style>
+</head>
+<body>
+
+<!-- ============ HOME / SHARE ============ -->
+<div id="home" class="wrap" hidden>
+  <h1>📡 WebShare <span id="status" class="pill">offline</span></h1>
+
+  <div class="card">
+    <div class="row">
+      <select id="source">
+        <option value="screen">Screen / window / tab</option>
+        <option value="camera">Camera</option>
+      </select>
+      <select id="camera" hidden></select>
+      <label class="muted"><input type="checkbox" id="audio"> Audio</label>
+      <select id="quality">
+        <option value="480">480p</option>
+        <option value="720">720p</option>
+        <option value="1080" selected>1080p</option>
+      </select>
+      <button id="start" class="primary">Start sharing</button>
+      <button id="stop" class="danger" hidden>Stop</button>
+      <span class="muted">Viewers: <b id="count">0</b></span>
+    </div>
+  </div>
+
+  <div id="linkCard" class="card" hidden>
+    <div class="grid">
+      <div>
+        <div class="muted">Watch code</div>
+        <div id="code" class="code"></div>
+        <div class="muted" style="margin-top:8px">Open this link in any browser – no app needed:</div>
+        <code id="link" class="link"></code>
+        <div class="row" style="margin-top:10px"><button id="copy">Copy link</button></div>
+      </div>
+      <div id="qr"></div>
+    </div>
+  </div>
+
+  <video id="preview" class="preview" autoplay muted playsinline hidden></video>
+
+  <div class="card" style="margin-top:16px">
+    <b>Watch a share</b>
+    <div class="row" style="margin-top:10px">
+      <input id="joinCode" type="text" placeholder="CODE" maxlength="12" autocomplete="off">
+      <button id="join">Watch</button>
+    </div>
+  </div>
+  <p class="muted">Video goes directly between browsers (WebRTC). Only the connection setup uses the free PeerJS server.</p>
+</div>
+
+<!-- ============ VIEWER ============ -->
+<div id="viewer" hidden>
+  <video id="video" autoplay muted playsinline></video>
+  <div id="vmsg">Connecting…</div>
+  <div id="bar">
+    <span id="vstatus" class="pill">connecting</span>
+    <span id="vcode" class="muted"></span>
+    <span class="spacer"></span>
+    <button id="unmute" hidden>🔊 Unmute</button>
+    <button id="fs">⛶ Fullscreen</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const PREFIX = 'webshare-v1-';
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const pill = (el, text, live) => { el.textContent = text; el.className = 'pill' + (live ? ' live' : ''); };
+const watchUrl = (code) => `${location.origin}${location.pathname}?watch=${code}`;
+
+const watchCode = (new URLSearchParams(location.search).get('watch') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+if (watchCode) startViewer(watchCode); else startHome();
+
+// =====================================================================
+// SHARER
+// =====================================================================
+function startHome() {
+  $('home').hidden = false;
+  let stream = null, peer = null, code = store.get('webshare-code') || randomCode();
+  const conns = new Map(); // viewerPeerId -> { conn, call }
+
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    $('source').value = 'camera';
+    $('source').querySelector('[value=screen]').disabled = true;
+    $('camera').hidden = false; listCameras();
+  }
+  $('source').onchange = () => { $('camera').hidden = $('source').value !== 'camera'; if (!$('camera').hidden) listCameras(); };
+
+  async function listCameras() {
+    try {
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+      const cur = $('camera').value;
+      $('camera').innerHTML = '<option value="user">Front camera</option><option value="environment">Back camera</option>'
+        + devs.filter(d => d.deviceId).map((d, i) => `<option value="${d.deviceId}">${d.label || 'Camera ' + (i + 1)}</option>`).join('');
+      if (cur) $('camera').value = cur;
+    } catch (e) {}
+  }
+
+  async function capture() {
+    const h = +$('quality').value, audio = $('audio').checked;
+    if ($('source').value === 'screen')
+      return navigator.mediaDevices.getDisplayMedia({ video: { height: { ideal: h }, frameRate: { ideal: 30 } }, audio });
+    const cam = $('camera').value || 'user';
+    const video = { height: { ideal: h } };
+    if (cam === 'user' || cam === 'environment') video.facingMode = cam; else video.deviceId = { exact: cam };
+    const s = await navigator.mediaDevices.getUserMedia({ video, audio });
+    listCameras();
+    return s;
+  }
+
+  async function start() {
+    let s;
+    try { s = await capture(); } catch (e) { if (e.name !== 'NotAllowedError') alert(e.message || e); return; }
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = s;
+    $('preview').srcObject = stream; $('preview').hidden = false;
+    stream.getVideoTracks()[0].onended = stop;
+    $('start').textContent = 'Switch source'; $('stop').hidden = false;
+    if (!peer) openPeer();
+    else for (const id of conns.keys()) callViewer(id); // re-send new stream
+  }
+
+  function stop() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null; $('preview').srcObject = null; $('preview').hidden = true;
+    for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
+    conns.clear(); updateCount();
+    if (peer) { peer.destroy(); peer = null; }
+    $('start').textContent = 'Start sharing'; $('stop').hidden = true; $('linkCard').hidden = true;
+    pill($('status'), 'offline');
+  }
+
+  function openPeer() {
+    pill($('status'), 'connecting…');
+    peer = new Peer(PREFIX + code);
+    peer.on('open', () => {
+      store.set('webshare-code', code);
+      pill($('status'), 'LIVE', true);
+      showLink();
+    });
+    peer.on('connection', (conn) => {
+      conn.on('open', () => { conns.set(conn.peer, { conn, call: null }); callViewer(conn.peer); updateCount(); });
+      conn.on('close', () => { conns.get(conn.peer)?.call?.close(); conns.delete(conn.peer); updateCount(); });
+    });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) { pill($('status'), 'reconnecting…'); setTimeout(() => peer && !peer.destroyed && peer.reconnect(), 1500); } });
+    peer.on('error', (err) => {
+      if (err.type === 'unavailable-id') { // code taken (e.g. open in another tab) -> new code
+        peer.destroy(); code = randomCode(); openPeer();
+      } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
+        pill($('status'), 'reconnecting…');
+      } else console.warn(err);
+    });
+  }
+
+  function callViewer(id) {
+    const entry = conns.get(id); if (!entry || !stream) return;
+    entry.call?.close();
+    entry.call = peer.call(id, stream);
+  }
+
+  function updateCount() { $('count').textContent = conns.size; }
+
+  function showLink() {
+    $('code').textContent = code;
+    $('link').textContent = watchUrl(code);
+    $('qr').innerHTML = '';
+    if (window.QRCode) new QRCode($('qr'), { text: watchUrl(code), width: 168, height: 168, correctLevel: QRCode.CorrectLevel.M });
+    $('linkCard').hidden = false;
+  }
+
+  $('start').onclick = start;
+  $('stop').onclick = stop;
+  $('copy').onclick = () => navigator.clipboard?.writeText(watchUrl(code)).then(() => { $('copy').textContent = 'Copied ✓'; setTimeout(() => $('copy').textContent = 'Copy link', 1500); });
+  const join = () => { const c = $('joinCode').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c) location.href = watchUrl(c); };
+  $('join').onclick = join;
+  $('joinCode').onkeydown = (e) => { if (e.key === 'Enter') join(); };
+}
+
+// =====================================================================
+// VIEWER
+// =====================================================================
+function startViewer(code) {
+  $('viewer').hidden = false;
+  $('vcode').textContent = code;
+  document.title = `WebShare – ${code}`;
+  const video = $('video');
+  const msg = (t) => { $('vmsg').innerHTML = t; $('vmsg').hidden = !t; };
+  let peer, conn, retry;
+
+  function waiting() {
+    video.srcObject = null; pill($('vstatus'), 'waiting');
+    msg(`Waiting for <b>${code}</b> to start sharing…`);
+    clearTimeout(retry); retry = setTimeout(connect, 3000);
+  }
+
+  function connect() {
+    if (!peer || peer.destroyed || peer.disconnected) return;
+    conn?.close();
+    conn = peer.connect(PREFIX + code, { reliable: true });
+    conn.on('open', () => { pill($('vstatus'), 'connecting'); msg('Connecting…'); });
+    conn.on('close', waiting);
+  }
+
+  peer = new Peer();
+  peer.on('open', connect);
+  peer.on('call', (call) => {
+    call.answer();
+    call.on('stream', (s) => {
+      video.srcObject = s;
+      $('unmute').hidden = !s.getAudioTracks().length || !video.muted;
+      video.play().catch(() => {});
+    });
+  });
+  peer.on('error', (err) => {
+    if (err.type === 'peer-unavailable') waiting();
+    else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) { msg('Network problem – retrying…'); }
+    else console.warn(err);
+  });
+  peer.on('disconnected', () => setTimeout(() => { if (!peer.destroyed) peer.reconnect(); }, 2000));
+
+  video.addEventListener('playing', () => { msg(''); pill($('vstatus'), 'LIVE', true); });
+
+  $('unmute').onclick = () => { video.muted = false; video.play(); $('unmute').hidden = true; };
+  $('fs').onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+    else if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+  };
+  let hideT;
+  const poke = () => { $('bar').classList.remove('hide'); clearTimeout(hideT); hideT = setTimeout(() => $('bar').classList.add('hide'), 3000); };
+  ['mousemove', 'touchstart', 'keydown'].forEach(e => document.addEventListener(e, poke));
+  poke();
+}
+</script>
+</body>
+</html>

@@ -48,3 +48,11 @@ Plain MJPEG stream:          http://192.168.1.20:8080/stream.mjpg
 * Ports: `PORT=8080`, `HTTPS_PORT=8443`, set `NO_HTTPS=1` to disable HTTPS. Allow these ports in
   your firewall if other devices can't connect.
 * No authentication – anyone on your network who knows the address can watch. Use on trusted networks.
+
+## GitHub Pages version (no server)
+
+`docs/index.html` is a single-file version hosted at **https://umilan.github.io/webshare/**.
+GitHub Pages can't run `server.js`, so it uses the free PeerJS cloud service to connect the browsers
+(video still goes directly between them). Press **Start sharing**, then open the shown link,
+scan the QR code, or type the 6-letter code on another device. Because github.io is HTTPS,
+phones can share their camera too. There is no IP address or MJPEG stream in this version.
