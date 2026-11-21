@@ -199,6 +199,10 @@ input[type=text] { padding:0 14px; display:block; }
 #srcMenu.anim-out { animation:dropOut .14s ease-in both; }
 @media (max-width:640px) { #srcWrap { max-width:none; } #topbar #srcMenu button { font-size:14px; } }
 @media (prefers-reduced-motion: reduce) { #srcMenu { animation:none !important; } }
+
+/* ---- top bar: no background / border, content centred on every screen size */
+#topbar { background:transparent; border-bottom:0; justify-content:center; }
+#topbar .spacer { display:none; }
 </style>
 </head>
 <body>
@@ -298,7 +302,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.23.0'; // bump on every published change
+const APP_VERSION = '1.23.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
