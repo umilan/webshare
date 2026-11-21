@@ -17,78 +17,83 @@ button:hover { border-color:var(--accent); }
 button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
 button.danger { background:var(--bad); border-color:var(--bad); color:#fff; font-weight:600; }
 input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1px solid var(--line); border-radius:8px; padding:9px 12px; width:9em; text-transform:uppercase; letter-spacing:.1em; }
-.wrap { max-width:1000px; margin:0 auto; padding:16px; }
-h1 { font-size:22px; margin:4px 0 16px; }
-.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
-.row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+/* sharer: top bar + centered preview */
+#home { display:flex; flex-direction:column; height:100vh; height:100dvh; }
+#topbar { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 12px; background:var(--panel); border-bottom:1px solid var(--line); position:relative; z-index:2; }
+#topbar button, #topbar select { padding:6px 10px; font-size:14px; }
+#topbar .brand { font-weight:700; margin-right:4px; white-space:nowrap; }
+#topbar .sep { width:1px; align-self:stretch; background:var(--line); margin:0 4px; }
+#topbar .code { font-weight:800; letter-spacing:.12em; font-size:16px; }
 .muted { color:var(--muted); }
-.pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:13px; border:1px solid var(--line); vertical-align:middle; }
+.pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); }
 .pill.live { background:var(--bad); border-color:var(--bad); color:#fff; font-weight:700; }
-code.link { display:block; background:#0b0d11; border:1px solid var(--line); padding:10px 12px; border-radius:8px; word-break:break-all; user-select:all; font-size:16px; }
-.code { font-size:34px; font-weight:800; letter-spacing:.15em; }
-#qr { background:#fff; padding:10px; border-radius:8px; width:max-content; }
+#stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:16px; }
+#preview { max-width:100%; max-height:100%; background:#000; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+#idle { text-align:center; color:var(--muted); }
+#idle .row { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+#qrPop { position:absolute; right:12px; top:calc(100% + 8px); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; width:220px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+#qr { background:#fff; padding:10px; border-radius:8px; width:max-content; margin:0 auto; }
 #qr img, #qr canvas { display:block; }
-video.preview { width:100%; max-height:55vh; background:#000; border-radius:10px; display:block; }
-.grid { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; }
-@media (max-width:640px) { .grid { grid-template-columns:1fr; } }
+#link { display:block; margin-top:8px; font-size:12px; word-break:break-all; color:var(--muted); user-select:all; }
+.spacer { flex:1; }
+#linkCard { display:inline-flex; gap:6px; align-items:center; }
+@media (max-width:640px) {
+  .wide { display:none; }
+  #topbar { gap:4px; padding:6px 8px; }
+  #topbar button, #topbar select { padding:5px 7px; font-size:13px; }
+  #camera { max-width:7.5em; }
+  #stage { padding:8px; }
+}
 /* viewer */
 #viewer { position:fixed; inset:0; background:#000; display:flex; align-items:center; justify-content:center; }
 #viewer video { width:100%; height:100%; object-fit:contain; }
 #vmsg { position:absolute; text-align:center; color:var(--muted); padding:20px; }
 #bar { position:fixed; left:0; right:0; bottom:0; padding:12px 16px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:linear-gradient(transparent,rgba(0,0,0,.8)); transition:opacity .3s; }
 #bar.hide { opacity:0; pointer-events:none; }
-.spacer { flex:1; }
 [hidden] { display:none !important; }
 </style>
 </head>
 <body>
 
 <!-- ============ HOME / SHARE ============ -->
-<div id="home" class="wrap" hidden>
-  <h1>📡 WebShare <span id="status" class="pill">offline</span></h1>
-
-  <div class="card">
-    <div class="row">
-      <select id="source">
-        <option value="screen">Screen / window / tab</option>
-        <option value="camera">Camera</option>
-      </select>
-      <select id="camera" hidden></select>
-      <label class="muted"><input type="checkbox" id="audio"> Audio</label>
-      <select id="quality">
-        <option value="480">480p</option>
-        <option value="720">720p</option>
-        <option value="1080" selected>1080p</option>
-      </select>
-      <button id="start" class="primary">Start sharing</button>
-      <button id="stop" class="danger" hidden>Stop</button>
-      <span class="muted">Viewers: <b id="count">0</b></span>
-    </div>
+<div id="home" hidden>
+  <div id="topbar">
+    <span class="brand">📡<span class="wide"> WebShare</span></span>
+    <span id="status" class="pill">offline</span>
+    <span class="sep wide"></span>
+    <select id="source" title="Source">
+      <option value="screen">Screen</option>
+      <option value="camera">Camera</option>
+    </select>
+    <select id="camera" hidden title="Camera"></select>
+    <select id="quality" title="Quality">
+      <option value="480">480</option>
+      <option value="720">720</option>
+      <option value="1080" selected>1080</option>
+    </select>
+    <label class="muted" title="Share audio"><input type="checkbox" id="audio"> 🔊</label>
+    <button id="start" class="primary">Start</button>
+    <button id="stop" class="danger" hidden>Stop</button>
+    <span class="spacer"></span>
+    <span id="linkCard" hidden>
+      <span class="muted wide">Code</span> <span id="code" class="code"></span>
+      <button id="copy" title="Copy watch link">Copy</button>
+      <button id="qrBtn" title="Show QR code">QR</button>
+      <span class="muted" title="Viewers">👁 <b id="count">0</b></span>
+    </span>
+    <div id="qrPop" hidden><div id="qr"></div><span id="link"></span></div>
   </div>
-
-  <div id="linkCard" class="card" hidden>
-    <div class="grid">
-      <div>
-        <div class="muted">Watch code</div>
-        <div id="code" class="code"></div>
-        <div class="muted" style="margin-top:8px">Open this link in any browser – no app needed:</div>
-        <code id="link" class="link"></code>
-        <div class="row" style="margin-top:10px"><button id="copy">Copy link</button></div>
+  <div id="stage">
+    <video id="preview" autoplay muted playsinline hidden></video>
+    <div id="idle">
+      <div style="font-size:42px">📡</div>
+      Choose <b>Screen</b> or <b>Camera</b> above and press <b>Start</b>.
+      <div class="row">
+        <input id="joinCode" type="text" placeholder="CODE" maxlength="12" autocomplete="off">
+        <button id="join">Watch</button>
       </div>
-      <div id="qr"></div>
     </div>
   </div>
-
-  <video id="preview" class="preview" autoplay muted playsinline hidden></video>
-
-  <div class="card" style="margin-top:16px">
-    <b>Watch a share</b>
-    <div class="row" style="margin-top:10px">
-      <input id="joinCode" type="text" placeholder="CODE" maxlength="12" autocomplete="off">
-      <button id="join">Watch</button>
-    </div>
-  </div>
-  <p class="muted">Video goes directly between browsers (WebRTC). Only the connection setup uses the free PeerJS server.</p>
 </div>
 
 <!-- ============ VIEWER ============ -->
@@ -158,20 +163,20 @@ function startHome() {
     try { s = await capture(); } catch (e) { if (e.name !== 'NotAllowedError') alert(e.message || e); return; }
     if (stream) stream.getTracks().forEach(t => t.stop());
     stream = s;
-    $('preview').srcObject = stream; $('preview').hidden = false;
+    $('preview').srcObject = stream; $('preview').hidden = false; $('idle').hidden = true;
     stream.getVideoTracks()[0].onended = stop;
-    $('start').textContent = 'Switch source'; $('stop').hidden = false;
+    $('start').textContent = 'Switch'; $('stop').hidden = false;
     if (!peer) openPeer();
     else for (const id of conns.keys()) callViewer(id); // re-send new stream
   }
 
   function stop() {
     if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = null; $('preview').srcObject = null; $('preview').hidden = true;
+    stream = null; $('preview').srcObject = null; $('preview').hidden = true; $('idle').hidden = false; $('qrPop').hidden = true;
     for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
     conns.clear(); updateCount();
     if (peer) { peer.destroy(); peer = null; }
-    $('start').textContent = 'Start sharing'; $('stop').hidden = true; $('linkCard').hidden = true;
+    $('start').textContent = 'Start'; $('stop').hidden = true; $('linkCard').hidden = true;
     pill($('status'), 'offline');
   }
 
@@ -215,7 +220,9 @@ function startHome() {
 
   $('start').onclick = start;
   $('stop').onclick = stop;
-  $('copy').onclick = () => navigator.clipboard?.writeText(watchUrl(code)).then(() => { $('copy').textContent = 'Copied ✓'; setTimeout(() => $('copy').textContent = 'Copy link', 1500); });
+  $('qrBtn').onclick = (e) => { e.stopPropagation(); $('qrPop').hidden = !$('qrPop').hidden; };
+  document.addEventListener('click', (e) => { if (!$('qrPop').contains(e.target)) $('qrPop').hidden = true; });
+  $('copy').onclick = () => navigator.clipboard?.writeText(watchUrl(code)).then(() => { $('copy').textContent = '✓'; setTimeout(() => $('copy').textContent = 'Copy', 1500); });
   const join = () => { const c = $('joinCode').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c) location.href = watchUrl(c); };
   $('join').onclick = join;
   $('joinCode').onkeydown = (e) => { if (e.key === 'Enter') join(); };
