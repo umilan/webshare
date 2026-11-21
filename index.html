@@ -27,9 +27,9 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 .muted { color:var(--muted); }
 .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); }
 .pill.live { background:var(--bad); border-color:var(--bad); color:#fff; font-weight:700; }
-#stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:16px; }
-#previewWrap { position:relative; display:flex; max-width:100%; max-height:100%; min-height:0; }
-#preview { max-width:100%; max-height:100%; min-height:0; background:#000; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+#stage { flex:1; min-height:0; overflow:hidden; display:flex; align-items:center; justify-content:center; padding:16px; }
+#previewWrap { position:relative; display:flex; flex:none; }
+#preview { width:100%; height:100%; object-fit:contain; background:#000; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
 #status { position:absolute; top:10px; left:10px; padding:2px 8px; font-size:11px; letter-spacing:.06em; background:rgba(0,0,0,.6); border-color:transparent; color:#fff; backdrop-filter:blur(4px); pointer-events:none; }
 #status.live { background:var(--bad); }
 #status.live::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:#fff; margin-right:5px; vertical-align:1px; animation:blink 1.4s infinite; }
@@ -48,7 +48,10 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #topbar .seg button { border:0; background:transparent; padding:5px 10px; border-radius:7px; color:var(--muted); display:flex; }
 #topbar .seg button[aria-checked=true] { background:var(--accent); color:#fff; }
 #toast { position:fixed; left:50%; top:72px; transform:translateX(-50%); z-index:20; width:max-content; max-width:min(92vw, 480px); background:#2a2f3a; color:var(--text); border:1px solid var(--line); border-radius:12px; padding:12px 16px; box-shadow:0 10px 30px rgba(0,0,0,.5); font-size:14px; }
-#footer { text-align:center; font-size:11px; color:var(--muted); opacity:.7; padding:4px 0 6px; }
+#footer { display:flex; flex-direction:column; align-items:center; gap:6px; padding:4px 12px 8px; }
+#footer .verText { font-size:11px; color:var(--muted); opacity:.7; }
+#footer .code { font-weight:800; letter-spacing:.12em; font-size:18px; }
+#footer button { padding:7px 16px; }
 #topbar select { -webkit-appearance:none; appearance:none; padding-right:26px;
   background:var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23e8eaf0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center / 10px 7px; }
 #topbar #camera { flex:1 1 6em; min-width:6em; max-width:320px; }
@@ -64,11 +67,10 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #topbar #quality button[aria-checked=true] { background:var(--accent); color:#fff; }
 .prefNote { font-size:12px; color:var(--muted); }
 #topbar .toggle[aria-pressed=true] { color:#fff; background:#1f8f4e; border-color:#1f8f4e; }
-#linkCard { display:inline-flex; gap:6px; align-items:center; }
+#linkCard { display:inline-flex; gap:10px; align-items:center; }
+#linkCard[hidden] { display:none; }
 @media (max-width:640px) {
   #topbar #camera { max-width:none; }
-  #topbar .spacer { display:none; }
-  #linkCard { margin-left:auto; }
   .wide { display:none; }
   #topbar { gap:4px; padding:6px 8px; }
   #topbar button, #topbar select { padding:5px 7px; font-size:13px; }
@@ -110,12 +112,6 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
     </span>
     <button id="start" class="primary">Start</button>
     <button id="stop" class="danger" hidden>Stop</button>
-    <span class="spacer"></span>
-    <span id="linkCard" hidden>
-      <span class="muted wide">Code</span> <span id="code" class="code"></span>
-      <button id="qrBtn" class="primary" title="Share watch link (QR, copy)">Share</button>
-      <span class="muted" title="Viewers">👁 <b id="count">0</b></span>
-    </span>
   </div>
   <div id="toast" hidden role="status"></div>
   <div id="qrModal" hidden role="dialog" aria-modal="true" aria-label="Watch link QR code">
@@ -142,7 +138,14 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
       </div>
     </div>
   </div>
-<footer id="footer">WebShare <span class="ver"></span></footer>
+<footer id="footer">
+    <span id="linkCard" hidden>
+      <span class="muted">Code</span> <span id="code" class="code"></span>
+      <button id="qrBtn" class="primary" title="Share watch link (QR, copy)">Share</button>
+      <span class="muted" title="Viewers">👁 <b id="count">0</b></span>
+    </span>
+    <span class="verText">WebShare <span class="ver"></span></span>
+  </footer>
 </div>
 
 <!-- ============ VIEWER ============ -->
@@ -161,7 +164,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.11.1'; // bump on every published change
+const APP_VERSION = '1.12.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -249,12 +252,27 @@ function startHome() {
     return s;
   }
 
+  // size the preview box to the video's aspect ratio so the LIVE badge sits on the picture
+  function fitPreview() {
+    const v = $('preview'), st = $('stage'), cs = getComputedStyle(st);
+    const vw = v.videoWidth || 16, vh = v.videoHeight || 9;
+    const aw = st.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const ah = st.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const k = Math.min(aw / vw, ah / vh);
+    $('previewWrap').style.width = Math.floor(vw * k) + 'px';
+    $('previewWrap').style.height = Math.floor(vh * k) + 'px';
+  }
+  $('preview').addEventListener('loadedmetadata', fitPreview);
+  $('preview').addEventListener('resize', fitPreview); // rotation / source change
+  // refit whenever the free area changes (window resize, footer appearing, top bar wrapping)
+  new ResizeObserver(() => { if (!$('previewWrap').hidden) fitPreview(); }).observe($('stage'));
+
   async function start() {
     let s;
     try { s = await capture(); } catch (e) { if (e.name !== 'NotAllowedError') alert(e.message || e); return; }
     if (stream) stream.getTracks().forEach(t => t.stop());
     stream = s;
-    $('preview').srcObject = stream; $('previewWrap').hidden = false; $('idle').hidden = true;
+    $('preview').srcObject = stream; $('previewWrap').hidden = false; $('idle').hidden = true; fitPreview();
     stream.getVideoTracks()[0].onended = stop;
     $('start').textContent = 'Switch'; $('stop').hidden = false;
     if (!peer) openPeer();
