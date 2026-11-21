@@ -41,11 +41,16 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 #idle p { margin:6px auto; max-width:440px; line-height:1.5; }
 #idle b { color:var(--text); }
 #idle .row { display:flex; gap:8px; justify-content:center; margin-top:12px; }
-#qrModal { position:fixed; inset:0; z-index:10; background:rgba(8,9,12,.94); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:20px; }
-#qr { background:#fff; padding:16px; border-radius:16px; width:min(86vw, 62vh, 560px); }
+#qrModal { position:fixed; inset:0; z-index:10; background:rgba(8,9,12,.94); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; overflow:auto; padding:20px; }
+#qr { background:#fff; padding:14px; border-radius:16px; width:min(86vw, 50vh, 560px); }
 #qr img, #qr canvas { display:block; width:100% !important; height:auto !important; image-rendering:pixelated; }
 #qrCode { font-size:28px; font-weight:800; letter-spacing:.15em; }
-#link { max-width:min(92vw, 640px); text-align:center; font-size:16px; word-break:break-all; color:var(--text); background:#0b0d11; border:1px solid var(--line); border-radius:10px; padding:10px 14px; user-select:all; }
+#qrModal .urlRow { display:flex; align-items:stretch; gap:8px; width:min(92vw, 640px); }
+#qrModal .iconBtn { display:flex; align-items:center; justify-content:center; padding:0 14px; }
+#qrModal .iconBtn svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+#qrModal .iconBtn.ok { background:#1f8f4e; border-color:#1f8f4e; color:#fff; }
+#qrModal #qrShare, #qrModal #qrClose { min-width:12em; }
+#link { flex:1; min-width:0; text-align:center; font-size:16px; word-break:break-all; color:var(--text); background:#0b0d11; border:1px solid var(--line); border-radius:10px; padding:10px 14px; user-select:all; }
 #qrModal .row { display:flex; gap:10px; }
 #rxModal { position:fixed; inset:0; z-index:10; background:rgba(8,9,12,.96); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px; }
 #rxModal[hidden] { display:none; }
@@ -147,12 +152,12 @@ button.big { padding:11px 22px; font-size:16px; }
   <div id="qrModal" hidden role="dialog" aria-modal="true" aria-label="Watch link QR code">
     <div id="qrCode"></div>
     <div id="qr"></div>
-    <div id="link"></div>
-    <div class="row">
-      <button id="qrCopy" class="primary">Copy link</button>
-      <button id="qrShare" hidden>Share…</button>
-      <button id="qrClose">Close</button>
+    <div class="urlRow">
+      <div id="link"></div>
+      <button id="qrCopy" class="iconBtn" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
     </div>
+    <button id="qrShare" class="primary" hidden>Share…</button>
+    <button id="qrClose">Close</button>
   </div>
   <div id="stage">
     <div id="previewWrap" hidden>
@@ -197,7 +202,7 @@ button.big { padding:11px 22px; font-size:16px; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.16.2'; // bump on every published change
+const APP_VERSION = '1.16.3'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -382,13 +387,17 @@ function startHome() {
       const t = document.createElement('textarea'); t.value = url; document.body.appendChild(t); t.select();
       document.execCommand('copy'); t.remove();
     }
-    btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = label, 1500);
+    if (btn.classList.contains('iconBtn')) {
+      btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'; btn.classList.add('ok');
+      setTimeout(() => { btn.innerHTML = label; btn.classList.remove('ok'); }, 1500);
+    } else { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = label, 1500); }
   }
   if (navigator.share) { // native share sheet (Messages, WhatsApp, Mail…)
     $('qrShare').hidden = false;
     $('qrShare').onclick = () => navigator.share({ title: 'WebShare', text: `Watch my stream (code ${code})`, url: watchUrl(code) }).catch(() => {});
   }
-  $('qrCopy').onclick = () => copyLink($('qrCopy'), 'Copy link');
+  const copyIcon = $('qrCopy').innerHTML;
+  $('qrCopy').onclick = () => copyLink($('qrCopy'), copyIcon);
   $('qrBtn').onclick = () => { $('qrModal').hidden = false; };
   $('qrClose').onclick = () => { $('qrModal').hidden = true; };
   $('qrModal').onclick = (e) => { if (e.target === $('qrModal')) $('qrModal').hidden = true; };
