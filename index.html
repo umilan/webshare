@@ -66,7 +66,6 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 <div id="home" hidden>
   <div id="topbar">
     <span class="brand">📡<span class="wide"> WebShare</span></span>
-    <span id="status" class="pill">offline</span>
     <span class="sep wide"></span>
     <div id="source" class="seg" role="radiogroup" aria-label="Source">
       <button type="button" data-v="screen" role="radio" aria-checked="true" title="Screen" aria-label="Screen">
@@ -104,7 +103,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
     <video id="preview" autoplay muted playsinline hidden></video>
     <div id="idle">
       <div style="font-size:42px">📡</div>
-      Choose <b>Screen</b> or <b>Camera</b> above and press <b>Start</b>.
+      <span id="hint">Choose <b>Screen</b> or <b>Camera</b> above and press <b>Start</b>.</span>
       <div class="row">
         <input id="joinCode" type="text" placeholder="CODE" maxlength="12" autocomplete="off">
         <button id="join">Watch</button>
@@ -154,8 +153,11 @@ function startHome() {
     if (v === 'camera') listCameras();
   }
   $('source').querySelectorAll('button').forEach(b => b.onclick = () => setSource(b.dataset.v));
-  if (!navigator.mediaDevices?.getDisplayMedia) { // phones can't share the screen
+  // phones/tablets can't share the screen (iOS even exposes getDisplayMedia but it always fails)
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isMobile || !navigator.mediaDevices?.getDisplayMedia) {
     $('source').querySelector('[data-v=screen]').hidden = true;
+    $('hint').innerHTML = 'Pick <b>Front</b> or <b>Rear</b> camera and press <b>Start</b>.';
     setSource('camera');
   }
 
@@ -203,27 +205,23 @@ function startHome() {
     conns.clear(); updateCount();
     if (peer) { peer.destroy(); peer = null; }
     $('start').textContent = 'Start'; $('stop').hidden = true; $('linkCard').hidden = true;
-    pill($('status'), 'offline');
   }
 
   function openPeer() {
-    pill($('status'), 'connecting…');
     peer = new Peer(PREFIX + code);
     peer.on('open', () => {
       store.set('webshare-code', code);
-      pill($('status'), 'LIVE', true);
       showLink();
     });
     peer.on('connection', (conn) => {
       conn.on('open', () => { conns.set(conn.peer, { conn, call: null }); callViewer(conn.peer); updateCount(); });
       conn.on('close', () => { conns.get(conn.peer)?.call?.close(); conns.delete(conn.peer); updateCount(); });
     });
-    peer.on('disconnected', () => { if (peer && !peer.destroyed) { pill($('status'), 'reconnecting…'); setTimeout(() => peer && !peer.destroyed && peer.reconnect(), 1500); } });
+    peer.on('disconnected', () => { if (peer && !peer.destroyed) { setTimeout(() => peer && !peer.destroyed && peer.reconnect(), 1500); } });
     peer.on('error', (err) => {
       if (err.type === 'unavailable-id') { // code taken (e.g. open in another tab) -> new code
         peer.destroy(); code = randomCode(); openPeer();
       } else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(err.type)) {
-        pill($('status'), 'reconnecting…');
       } else console.warn(err);
     });
   }
