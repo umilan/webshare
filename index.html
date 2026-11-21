@@ -205,7 +205,13 @@ input[type=text] { padding:0 14px; display:block; }
 #topbar .spacer { display:none; }
 
 /* ---- controls row lives in the footer, right above the action buttons */
-#footer #topbar { width:min(100%, 640px); padding:0; gap:8px; flex-wrap:nowrap; z-index:3; }
+#footer #topbar { width:min(100%, 640px); padding:0; gap:12px; flex-wrap:nowrap; z-index:3; }
+/* every control in the footer uses the same height as the action buttons */
+#footer #topbar #srcBtn, #footer #topbar #prefsBtn { height:var(--h); font-size:16px; }
+#footer #topbar #prefsBtn { width:var(--h); }
+#footer #topbar #prefsBtn svg { width:22px; height:22px; }
+#footer { gap:12px; padding:6px 12px max(12px, env(safe-area-inset-bottom)); }
+#idleActions, #linkCard { gap:12px; }
 #footer #srcWrap { max-width:none; }
 #srcMenu, #prefs { top:auto; bottom:calc(100% + 6px); }
 #srcMenu { transform-origin:bottom left; }
@@ -316,7 +322,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.24.1'; // bump on every published change
+const APP_VERSION = '1.24.2'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
