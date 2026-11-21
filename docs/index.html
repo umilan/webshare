@@ -112,6 +112,28 @@ button.big { padding:11px 22px; font-size:16px; }
 #bar { position:fixed; left:0; right:0; bottom:0; padding:12px 16px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; background:linear-gradient(transparent,rgba(0,0,0,.8)); transition:opacity .3s; }
 #bar.hide { opacity:0; pointer-events:none; }
 [hidden] { display:none !important; }
+
+/* ---- modal / dropdown / toast animations */
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes fadeOut { from { opacity:1; } to { opacity:0; } }
+@keyframes riseIn { from { opacity:0; transform:translateY(18px) scale(.97); } to { opacity:1; transform:none; } }
+@keyframes sinkOut { from { opacity:1; transform:none; } to { opacity:0; transform:translateY(18px) scale(.97); } }
+@keyframes dropIn { from { opacity:0; transform:translateY(-6px) scale(.98); } to { opacity:1; transform:none; } }
+@keyframes dropOut { from { opacity:1; transform:none; } to { opacity:0; transform:translateY(-6px) scale(.98); } }
+#qrModal.anim-in, #rxModal.anim-in { animation:fadeIn .2s ease-out both; }
+#qrModal.anim-out, #rxModal.anim-out { animation:fadeOut .18s ease-in both; }
+#qrModal.anim-in > *, #rxModal.anim-in > * { animation:riseIn .26s cubic-bezier(.2,.8,.3,1) both; }
+#qrModal.anim-out > *, #rxModal.anim-out > * { animation:sinkOut .18s ease-in both; }
+@keyframes toastIn { from { opacity:0; transform:translate(-50%, -10px); } to { opacity:1; transform:translate(-50%, 0); } }
+@keyframes toastOut { from { opacity:1; transform:translate(-50%, 0); } to { opacity:0; transform:translate(-50%, -10px); } }
+#prefs.anim-in { animation:dropIn .16s ease-out both; }
+#prefs.anim-out { animation:dropOut .14s ease-in both; }
+#toast.anim-in { animation:toastIn .2s ease-out both; }
+#toast.anim-out { animation:toastOut .18s ease-in both; }
+#prefs { transform-origin:top left; }
+@media (prefers-reduced-motion: reduce) {
+  #qrModal, #rxModal, #prefs, #toast, #qrModal > *, #rxModal > * { animation:none !important; }
+}
 </style>
 </head>
 <body>
@@ -202,14 +224,28 @@ button.big { padding:11px 22px; font-size:16px; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.16.3'; // bump on every published change
+const APP_VERSION = '1.17.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const pill = (el, text, live) => { el.textContent = text; el.className = 'pill' + (live ? ' live' : ''); };
+// ---- simple in/out animations for modals, dropdown and toast
+const isOpen = (el) => el.dataset.open === '1';
+function showEl(el) {
+  el.dataset.open = '1'; el.hidden = false;
+  el.classList.remove('anim-out'); void el.offsetWidth; el.classList.add('anim-in');
+}
+function hideEl(el) {
+  if (el.hidden || !isOpen(el)) { el.hidden = true; el.dataset.open = ''; return; }
+  el.dataset.open = ''; el.classList.remove('anim-in'); el.classList.add('anim-out');
+  const done = () => { if (!isOpen(el)) { el.hidden = true; el.classList.remove('anim-out'); } };
+  if (getComputedStyle(el).animationName === 'none') return done(); // reduced motion
+  el.addEventListener('animationend', done, { once: true });
+  setTimeout(done, 400); // safety net
+}
 let toastT;
-function toast(text) { const t = $('toast'); t.textContent = text; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 5000); }
+function toast(text) { const t = $('toast'); t.textContent = text; showEl(t); clearTimeout(toastT); toastT = setTimeout(() => hideEl(t), 5000); }
 const watchUrl = (code) => `${location.origin}${location.pathname}?watch=${code}`;
 
 document.querySelectorAll('.ver').forEach(e => e.textContent = 'v' + APP_VERSION);
@@ -235,15 +271,15 @@ function startHome() {
   $('quality').querySelectorAll('button').forEach(b => b.onclick = () => { quality = +b.dataset.q; store.set('webshare-quality', quality); renderPrefs(); if (stream) start(); });
   $('audio').onclick = () => { audioOn = !audioOn; store.set('webshare-audio', audioOn ? 'on' : 'off'); renderPrefs(); if (stream) start(); };
   function togglePrefs(open) {
-    $('prefs').hidden = !open; $('prefsBtn').setAttribute('aria-expanded', open);
+    open ? showEl($('prefs')) : hideEl($('prefs')); $('prefsBtn').setAttribute('aria-expanded', open);
     if (open) { // keep the panel on screen on narrow phones
       $('prefs').style.left = '0px';
       const r = $('prefs').getBoundingClientRect(), over = r.right - (document.documentElement.clientWidth - 8);
       if (over > 0) $('prefs').style.left = -over + 'px';
     }
   }
-  $('prefsBtn').onclick = (e) => { e.stopPropagation(); togglePrefs($('prefs').hidden); };
-  document.addEventListener('click', (e) => { if (!$('prefs').hidden && !$('prefs').contains(e.target)) togglePrefs(false); });
+  $('prefsBtn').onclick = (e) => { e.stopPropagation(); togglePrefs(!isOpen($('prefs'))); };
+  document.addEventListener('click', (e) => { if (isOpen($('prefs')) && !$('prefs').contains(e.target)) togglePrefs(false); });
   renderPrefs();
   // ---- source picker: screen + cameras in one dropdown
   // phones/tablets can't share the screen (iOS even exposes getDisplayMedia but it always fails)
@@ -333,7 +369,7 @@ function startHome() {
 
   function stop() {
     if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = null; $('preview').srcObject = null; $('previewWrap').hidden = true; pill($('status'), 'connecting…'); $('idle').hidden = false; $('idleActions').hidden = false; $('qrModal').hidden = true;
+    stream = null; $('preview').srcObject = null; $('previewWrap').hidden = true; pill($('status'), 'connecting…'); $('idle').hidden = false; $('idleActions').hidden = false; hideEl($('qrModal'));
     for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
     conns.clear(); updateCount();
     if (peer) { peer.destroy(); peer = null; }
@@ -398,10 +434,10 @@ function startHome() {
   }
   const copyIcon = $('qrCopy').innerHTML;
   $('qrCopy').onclick = () => copyLink($('qrCopy'), copyIcon);
-  $('qrBtn').onclick = () => { $('qrModal').hidden = false; };
-  $('qrClose').onclick = () => { $('qrModal').hidden = true; };
-  $('qrModal').onclick = (e) => { if (e.target === $('qrModal')) $('qrModal').hidden = true; };
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('qrModal').hidden = true; if (!$('rxModal').hidden) closeRx(); } });
+  $('qrBtn').onclick = () => showEl($('qrModal'));
+  $('qrClose').onclick = () => hideEl($('qrModal'));
+  $('qrModal').onclick = (e) => { if (e.target === $('qrModal')) hideEl($('qrModal')); };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { hideEl($('qrModal')); if (isOpen($('rxModal'))) closeRx(); } });
   const join = () => { const c = $('joinCode').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c) { closeRx(); location.href = watchUrl(c); } };
   $('transmitBtn').onclick = start;
 
@@ -419,11 +455,11 @@ function startHome() {
     return /^[A-Z0-9]{4,12}$/.test(t) ? t : null;
   }
   async function openRx() {
-    $('rxModal').hidden = false; $('scanBox').classList.remove('hit');
+    showEl($('rxModal')); $('scanBox').classList.remove('hit');
     $('scanMsg').textContent = 'Point the camera at the sharer\'s QR code…';
     try {
       scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      if ($('rxModal').hidden) return closeRx();
+      if (!isOpen($('rxModal'))) return closeRx();
       $('scan').srcObject = scanStream;
       if ('BarcodeDetector' in window) { try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { detector = null; } }
       if (!detector) await loadJsQR();
@@ -457,7 +493,7 @@ function startHome() {
   function closeRx() {
     clearInterval(scanTimer); scanTimer = null;
     if (scanStream) scanStream.getTracks().forEach(t => t.stop());
-    scanStream = null; $('scan').srcObject = null; $('rxModal').hidden = true;
+    scanStream = null; $('scan').srcObject = null; hideEl($('rxModal'));
   }
   $('receiveBtn').onclick = openRx;
   $('rxClose').onclick = closeRx;
