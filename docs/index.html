@@ -107,7 +107,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
         <div class="prefRow"><span>Audio</span>
           <button type="button" id="audio" class="toggle" aria-pressed="true">On</button>
         </div>
-        <div class="prefNote">Changes apply on Start / Switch.</div>
+        <div class="prefNote">While live, changes apply immediately.</div>
       </div>
     </span>
     <button id="start" class="primary">Start</button>
@@ -164,7 +164,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.12.0'; // bump on every published change
+const APP_VERSION = '1.13.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -194,8 +194,8 @@ function startHome() {
     $('audio').setAttribute('aria-pressed', audioOn);
     $('audio').textContent = audioOn ? 'On' : 'Off';
   }
-  $('quality').querySelectorAll('button').forEach(b => b.onclick = () => { quality = +b.dataset.q; store.set('webshare-quality', quality); renderPrefs(); });
-  $('audio').onclick = () => { audioOn = !audioOn; store.set('webshare-audio', audioOn ? 'on' : 'off'); renderPrefs(); };
+  $('quality').querySelectorAll('button').forEach(b => b.onclick = () => { quality = +b.dataset.q; store.set('webshare-quality', quality); renderPrefs(); if (stream) start(); });
+  $('audio').onclick = () => { audioOn = !audioOn; store.set('webshare-audio', audioOn ? 'on' : 'off'); renderPrefs(); if (stream) start(); };
   function togglePrefs(open) {
     $('prefs').hidden = !open; $('prefsBtn').setAttribute('aria-expanded', open);
     if (open) { // keep the panel on screen on narrow phones
@@ -267,17 +267,32 @@ function startHome() {
   // refit whenever the free area changes (window resize, footer appearing, top bar wrapping)
   new ResizeObserver(() => { if (!$('previewWrap').hidden) fitPreview(); }).observe($('stage'));
 
+  let applied = null; // source value of the running stream
   async function start() {
+    const value = $('camera').value;
+    // phones often can't open a second camera while one is running -> release the old one first
+    const releaseFirst = stream && value !== 'screen';
+    if (releaseFirst) stream.getTracks().forEach(t => t.stop());
     let s;
-    try { s = await capture(); } catch (e) { if (e.name !== 'NotAllowedError') alert(e.message || e); return; }
-    if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = s;
+    try { s = await capture(); }
+    catch (e) {
+      if (e.name !== 'NotAllowedError') toast(e.message || String(e));
+      if (stream && applied != null) {
+        $('camera').value = applied; // keep showing what is actually live
+        if (releaseFirst) { try { s = await capture(); } catch (e2) { return stop(); } } else return;
+      } else return;
+    }
+    if (stream && !releaseFirst) stream.getTracks().forEach(t => t.stop());
+    stream = s; applied = $('camera').value;
     $('preview').srcObject = stream; $('previewWrap').hidden = false; $('idle').hidden = true; fitPreview();
     stream.getVideoTracks()[0].onended = stop;
-    $('start').textContent = 'Switch'; $('stop').hidden = false;
+    $('start').hidden = true; $('stop').hidden = false;
     if (!peer) openPeer();
-    else for (const id of conns.keys()) callViewer(id); // re-send new stream
+    else for (const id of conns.keys()) callViewer(id); // send the new stream to every viewer
   }
+  // while live, any change of source / quality / audio applies immediately
+  const liveUpdate = () => { if (stream) start(); };
+  $('camera').addEventListener('change', liveUpdate);
 
   function stop() {
     if (stream) stream.getTracks().forEach(t => t.stop());
@@ -285,7 +300,7 @@ function startHome() {
     for (const { conn, call } of conns.values()) { call?.close(); conn.close(); }
     conns.clear(); updateCount();
     if (peer) { peer.destroy(); peer = null; }
-    $('start').textContent = 'Start'; $('stop').hidden = true; $('linkCard').hidden = true;
+    $('start').hidden = false; $('stop').hidden = true; applied = null; $('linkCard').hidden = true;
   }
 
   function openPeer() {
