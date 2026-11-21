@@ -249,10 +249,18 @@ input[type=text] { padding:0 14px; display:block; }
 /* ---- grouped switch: neutral white selection + responsive labels */
 #srcSeg { container-type:inline-size; }
 #topbar #srcSeg button[aria-checked=true] { background:#f2f3f5; color:#111418; font-weight:600; }
-#srcSeg .lbl { overflow:hidden; text-overflow:ellipsis; }
-#srcSeg .lbl.m, #srcSeg .lbl.s { display:none; }
-@container (max-width: 430px) { #srcSeg .lbl.l { display:none; } #srcSeg .lbl.m { display:inline; } }
-@container (max-width: 270px) { #srcSeg .lbl.m { display:none; } #srcSeg .lbl.s { display:inline; } }
+#srcSeg .lbl { overflow:hidden; text-overflow:clip; }
+#srcSeg .lbl { display:none; }
+#srcSeg[data-size=l] .lbl.l, #srcSeg[data-size=m] .lbl.m, #srcSeg[data-size=s] .lbl.s { display:inline; }
+#srcSeg[data-size=xs] .ico { font-size:18px; }
+
+/* ---- text source editor (bottom of the preview) */
+#textEdit { position:absolute; left:8px; right:8px; bottom:8px; z-index:3; }
+#previewWrap.textMode { bottom:calc(8px + var(--textEditH) + 10px); }
+:root { --textEditH:72px; }
+#textEdit[hidden] { display:none; }
+#textInput { box-sizing:border-box; width:100%; height:var(--textEditH); resize:none; padding:11px 14px; font:600 16px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#fff; background:#0b0d11; border:1px solid var(--line); border-radius:var(--r); outline:none; display:block; }
+#textInput:focus { border-color:var(--accent); }
 </style>
 </head>
 <body>
@@ -294,6 +302,9 @@ input[type=text] { padding:0 14px; display:block; }
       <div style="font-size:42px">📡</div>
       <p>Pick a source below to see a preview.</p>
     </div>
+    <div id="textEdit" hidden>
+        <textarea id="textInput" rows="2" placeholder="Type your text…" aria-label="Text to show" enterkeyhint="done"></textarea>
+      </div>
     <button type="button" id="infoBtn" aria-label="How it works" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r=".6"/></svg></button>
     <div id="infoPop" hidden role="dialog" aria-label="How it works"><p id="hint"></p></div>
   </div>
@@ -351,7 +362,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.25.1'; // bump on every published change
+const APP_VERSION = '1.26.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -527,6 +538,63 @@ function startHome() {
     ms._cleanup = () => { clearInterval(timer); if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); } ac?.close(); URL.revokeObjectURL(url); };
     return ms;
   }
+  // ---- text source: white bold centred text on black, font size fitted to the frame
+  let textValue = store.get('webshare-text') || 'Hello 👋';
+  const TEXT_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  function wrapLines(ctx, text, maxW) {
+    const out = [];
+    for (const para of text.split('\n')) {
+      let line = '';
+      for (let word of para.split(/\s+/).filter(Boolean)) {
+        while (ctx.measureText(word).width > maxW && word.length > 1) { // break over-long words
+          let k = word.length - 1; while (k > 1 && ctx.measureText(word.slice(0, k)).width > maxW) k--;
+          if (line) { out.push(line); line = ''; }
+          out.push(word.slice(0, k)); word = word.slice(k);
+        }
+        const t = line ? line + ' ' + word : word;
+        if (ctx.measureText(t).width <= maxW || !line) line = t; else { out.push(line); line = word; }
+      }
+      out.push(line);
+    }
+    return out;
+  }
+  function drawText(canvas, ctx, text) {
+    const W = canvas.width, H = canvas.height;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    text = text.trim(); if (!text) return;
+    const maxW = W * 0.9, maxH = H * 0.86;
+    let lo = 8, hi = Math.floor(Math.min(W, H) * 0.7), best = lo, bestLines = [text];
+    while (lo <= hi) { // largest font size where the wrapped text still fits
+      const mid = (lo + hi) >> 1;
+      ctx.font = `700 ${mid}px ${TEXT_FONT}`;
+      const lines = wrapLines(ctx, text, maxW);
+      if (lines.length * mid * 1.18 <= maxH && lines.every(l => ctx.measureText(l).width <= maxW)) { best = mid; bestLines = lines; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    ctx.font = `700 ${best}px ${TEXT_FONT}`;
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const lh = best * 1.18, y0 = H / 2 - (bestLines.length - 1) * lh / 2;
+    bestLines.forEach((l, i) => ctx.fillText(l, W / 2, y0 + i * lh));
+  }
+  function streamFromText(h) {
+    // frame follows the shape of the preview area; shorter side = chosen quality
+    const r = $('stage').getBoundingClientRect(), w = r.width - 16, hh = r.height - 16 - 82; // minus the editor below
+    const aspect = w > 10 && hh > 10 ? w / hh : (innerWidth / innerHeight);
+    const k = Math.min(h / Math.min(aspect, 1), 1920 / Math.max(aspect, 1));
+    const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+    canvas.width = Math.round(aspect * k) & ~1; canvas.height = Math.round(k) & ~1;
+    const draw = () => drawText(canvas, ctx, textValue);
+    draw();
+    const timer = setInterval(draw, 250); // keep frames flowing so viewers stay in sync
+    const onInput = () => { textValue = $('textInput').value; store.set('webshare-text', textValue); draw(); };
+    $('textInput').value = textValue;
+    $('textInput').addEventListener('input', onInput);
+    const ms = canvas.captureStream(10);
+    ms.getVideoTracks().forEach(t => { try { t.contentHint = 'detail'; } catch (e) {} });
+    ms._cleanup = () => { clearInterval(timer); $('textInput').removeEventListener('input', onInput); };
+    return ms;
+  }
+
   const stopStream = (st) => { if (!st) return; st.getTracks().forEach(t => t.stop()); st._cleanup?.(); };
 
   // ---- custom source menu: mirrors the hidden <select id="camera">
@@ -540,6 +608,7 @@ function startHome() {
       case 'environment': return ['📷', 'Rear camera', 'Rear cam', 'Rear'];
       case 'user': return ['🤳', 'Front camera', 'Front cam', 'Front'];
       case 'file': return ['🖼️', 'Media', 'Media', 'Media'];
+      case 'text': return ['🔤', 'Text', 'Text', 'Text'];
       case 'screen': return ['🖥️', 'Screen', 'Screen', 'Screen'];
       case 'camera': return ['🤳', 'Front camera', 'Front cam', 'Front'];
       default: // computer webcams: the (first) built-in one faces the user; the full device name is in the tooltip
@@ -554,7 +623,17 @@ function startHome() {
       return `<button type="button" role="radio" data-v="${esc(o.value)}" aria-checked="${o.selected}" title="${esc(o.textContent)}" aria-label="${esc(l)}">`
         + `<span class="ico">${ico}</span><span class="lbl l">${esc(l)}</span><span class="lbl m">${esc(m)}</span><span class="lbl s">${esc(sh)}</span></button>`;
     }).join('');
+    fitLabels();
   }
+  // use the longest labels that fit: "Rear camera" -> "Rear cam" -> "Rear" -> icons only
+  function fitLabels() {
+    const seg = $('srcSeg');
+    for (const size of ['l', 'm', 's', 'xs']) {
+      seg.dataset.size = size;
+      if (size === 'xs' || ![...seg.querySelectorAll(`.lbl.${size}`)].some(l => l.scrollWidth > l.clientWidth + 1)) break;
+    }
+  }
+  new ResizeObserver(fitLabels).observe($('srcSeg'));
   $('srcSeg').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     const v = b.dataset.v;
@@ -583,6 +662,7 @@ function startHome() {
     // photo / video from the gallery sits next to Screen
     const fileOpts = [['file', '🖼️ Media']]; // tapping Media again always opens the dialog
     if (canScreen) opts.splice(1, 0, ...fileOpts); else opts.push(...fileOpts);
+    opts.push(['text', '🔤 Text']);
     $('camera').innerHTML = opts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
       + (canScreen ? '' : '<option value="screen" disabled>🖥️ Screen (computers only)</option>');
     if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
@@ -592,7 +672,7 @@ function startHome() {
     }
     renderSrc();
   }
-  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen, camera' : 'camera'} or media from your gallery (pick the source below), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
+  $('hint').innerHTML = `Transmit shares your ${canScreen ? 'screen, camera' : 'camera'}, media from your gallery or your own text (pick the source below), then send the link or QR to whoever should watch.<br>Receive watches someone else's stream – scan their QR code or type their code.`;
   listCameras().then(() => {
     const cam = [...sel.options].find(o => !o.disabled && !['screen', 'file', 'file-new'].includes(o.value));
     if (cam) { sel.value = cam.value; curSel = cam.value; start(); }
@@ -601,6 +681,7 @@ function startHome() {
   async function capture() {
     const h = quality, audio = audioOn;
     const v = $('camera').value;
+    if (v === 'text') return streamFromText(h);
     if (v === 'file' || v === 'file-new') {
       if (v === 'file-new' || !currentFile || forcePick) { forcePick = false; currentFile = await pickFile(); await listCameras(); }
       $('camera').value = 'file';
@@ -656,14 +737,16 @@ function startHome() {
     if (stream && !releaseFirst) stopStream(stream);
     stream = s; applied = $('camera').value; appliedLens = lensId;
     renderZoom(); renderSrc();
-    $('previewWrap').classList.toggle('contain', applied === 'screen' || applied === 'file');
+    $('previewWrap').classList.toggle('contain', applied === 'screen' || applied === 'file' || applied === 'text');
+    $('textEdit').hidden = applied !== 'text';
+    $('previewWrap').classList.toggle('textMode', applied === 'text');
     showPreview(stream); $('previewWrap').hidden = false; $('idle').hidden = true;
     stream.getVideoTracks()[0].onended = endAll; // e.g. screen sharing stopped from the browser bar
     if (!broadcasting) pill($('status'), 'PREVIEW');
     else for (const id of conns.keys()) callViewer(id); // send the new stream to every viewer
     return true;
   }
-  function showIdle() { $('previewWrap').hidden = true; $('idle').hidden = false; $('zoom').hidden = true; }
+  function showIdle() { $('textEdit').hidden = true; $('previewWrap').hidden = true; $('idle').hidden = false; $('zoom').hidden = true; }
   // drop the preview completely (no source running)
   function clearPreview() {
     stopStream(stream); stream = null; applied = null; appliedLens = null;
