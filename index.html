@@ -161,7 +161,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.11.0'; // bump on every published change
+const APP_VERSION = '1.11.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -219,18 +219,18 @@ function startHome() {
     let devs = [];
     try { devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && d.deviceId); } catch (e) {}
     const opts = [];
-    const screenOpt = canScreen ? ['screen', 'Screen'] : null;
+    const screenOpt = canScreen ? ['screen', '🖥️ Screen'] : null;
     if (screenOpt) opts.push(screenOpt);
     if (isMobile) {
-      opts.push(['environment', 'Rear camera'], ['user', 'Front camera']);
-      devs.forEach((d, i) => { const l = nice(d.label, i); if (!/^(front|rear) camera$/i.test(l)) opts.push([d.deviceId, l]); });
+      opts.push(['environment', '📷 Rear camera'], ['user', '🤳 Front camera']);
+      devs.forEach((d, i) => { const l = nice(d.label, i); if (!/^(front|rear) camera$/i.test(l)) opts.push([d.deviceId, (/^front/i.test(l) ? '🤳 ' : '📷 ') + l]); });
     } else {
       const named = devs.filter(d => d.label);
-      if (named.length) named.forEach((d, i) => opts.push([d.deviceId, nice(d.label, i)]));
-      else opts.push(['camera', 'Camera']);
+      if (named.length) named.forEach((d, i) => opts.push([d.deviceId, '🎥 ' + nice(d.label, i)]));
+      else opts.push(['camera', '🎥 Camera']);
     }
     $('camera').innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')
-      + (canScreen ? '' : '<option value="screen" disabled>Screen (computers only)</option>');
+      + (canScreen ? '' : '<option value="screen" disabled>🖥️ Screen (computers only)</option>');
     if (cur && opts.some(([v]) => v === cur)) $('camera').value = cur;
   }
   if (!canScreen) $('hint').innerHTML = 'Pick a camera above and press <b>Start</b>.';
