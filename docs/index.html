@@ -41,7 +41,7 @@ input[type=text] { font:inherit; color:var(--text); background:#0b0d11; border:1
   .wide { display:none; }
   #topbar { gap:4px; padding:6px 8px; }
   #topbar button, #topbar select { padding:5px 7px; font-size:13px; }
-  #camera { max-width:7.5em; }
+  
   #stage { padding:8px; }
 }
 /* viewer */
@@ -140,8 +140,11 @@ function startHome() {
     try {
       const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
       const cur = $('camera').value;
-      $('camera').innerHTML = '<option value="user">Front camera</option><option value="environment">Back camera</option>'
-        + devs.filter(d => d.deviceId).map((d, i) => `<option value="${d.deviceId}">${d.label || 'Camera ' + (i + 1)}</option>`).join('');
+      // short labels: "Front" / "Rear" (no "camera" word); e.g. iPhone "Back Ultra Wide Camera" -> "Rear Ultra Wide"
+      const short = (l, i) => (l || `Cam ${i + 1}`).replace(/^.*facing (front|back).*$/i, '$1').replace(/\s*\(.*?\)/g, '').replace(/\bcamera\b/ig, '').replace(/\bback\b/ig, 'Rear').replace(/\s+/g, ' ').trim() || `Cam ${i + 1}`;
+      const extra = devs.filter(d => d.deviceId).map((d, i) => [d.deviceId, short(d.label, i)]).filter(([, l]) => !/^(front|rear)$/i.test(l));
+      $('camera').innerHTML = '<option value="user">Front</option><option value="environment">Rear</option>'
+        + extra.map(([id, l]) => `<option value="${id}">${l}</option>`).join('');
       if (cur) $('camera').value = cur;
     } catch (e) {}
   }
