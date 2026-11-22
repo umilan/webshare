@@ -260,6 +260,10 @@ input[type=text] { padding:0 14px; display:block; }
 #textBox { max-width:90%; max-height:100%; color:#fff; font-weight:700; line-height:1.18; text-align:center; white-space:pre-wrap; overflow-wrap:anywhere; outline:none; caret-color:var(--accent); font-family:-apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif; }
 #textBox.empty::before { content:attr(data-ph); color:rgba(255,255,255,.35); }
 #textStage:focus-within { box-shadow:inset 0 0 0 2px var(--accent); }
+
+/* ---- Share modal: title on top, code under the QR */
+#qrModal .modalTitle { margin:0; font-size:18px; }
+#qrCode { font-size:24px; margin-top:-2px; }
 </style>
 </head>
 <body>
@@ -278,8 +282,9 @@ input[type=text] { padding:0 14px; display:block; }
     <button id="rxClose">Close</button>
   </div>
   <div id="qrModal" hidden role="dialog" aria-modal="true" aria-label="Watch link QR code">
-    <div id="qrCode"></div>
+    <h2 class="modalTitle">Share</h2>
     <div id="qr"></div>
+    <div id="qrCode"></div>
     <div class="urlRow">
       <div id="link"></div>
       <button id="qrCopy" class="iconBtn" title="Copy link" aria-label="Copy link"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
@@ -359,7 +364,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.27.1'; // bump on every published change
+const APP_VERSION = '1.27.2'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
