@@ -264,6 +264,13 @@ input[type=text] { padding:0 14px; display:block; }
 /* ---- Share modal: title on top, code under the QR */
 #qrModal .modalTitle { margin:0; font-size:18px; }
 #qrCode { font-size:24px; margin-top:-2px; }
+
+/* ---- all top headers: same size, same place (app name, Share, Receive) */
+#appHeader { padding-top:10px; }
+#appHeader .appName, #qrModal .modalTitle, #rxModal .modalTitle { font-size:22px; font-weight:700; line-height:32px; }
+.modalTitle { position:absolute; top:10px; left:0; right:0; margin:0; text-align:center; pointer-events:none; }
+#qrModal { padding-top:56px; background:var(--bg); }
+#rxModal { padding-top:56px; background:var(--bg); }
 </style>
 </head>
 <body>
@@ -272,7 +279,7 @@ input[type=text] { padding:0 14px; display:block; }
 <div id="home" hidden>
   <div id="toast" hidden role="status"></div>
   <div id="rxModal" class="modal" hidden role="dialog" aria-modal="true" aria-label="Receive a stream">
-    <h2>Receive</h2>
+    <h2 class="modalTitle">Receive</h2>
     <div id="scanBox"><video id="scan" autoplay muted playsinline></video><div class="frame"></div></div>
     <div id="scanMsg" class="muted">Point the camera at the sharer's QR code…</div>
     <div class="row">
@@ -364,7 +371,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.27.2'; // bump on every published change
+const APP_VERSION = '1.27.3'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
