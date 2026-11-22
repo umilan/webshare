@@ -257,7 +257,7 @@ input[type=text] { padding:0 14px; display:block; }
 /* ---- text source editor (bottom of the preview) */
 #textStage { position:absolute; inset:0; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:text; }
 #textStage[hidden] { display:none; }
-#textBox { max-width:90%; max-height:100%; color:#fff; font-weight:700; line-height:1.18; text-align:center; white-space:pre-wrap; overflow-wrap:anywhere; outline:none; caret-color:var(--accent); font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+#textBox { max-width:90%; max-height:100%; color:#fff; font-weight:700; line-height:1.18; text-align:center; white-space:pre-wrap; overflow-wrap:anywhere; outline:none; caret-color:var(--accent); font-family:-apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif; }
 #textBox.empty::before { content:attr(data-ph); color:rgba(255,255,255,.35); }
 #textStage:focus-within { box-shadow:inset 0 0 0 2px var(--accent); }
 </style>
@@ -359,7 +359,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.27.0'; // bump on every published change
+const APP_VERSION = '1.27.1'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -537,7 +537,7 @@ function startHome() {
   }
   // ---- text source: white bold centred text on black, font size fitted to the frame
   let textValue = store.get('webshare-text') || 'Hello 👋';
-  const TEXT_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const TEXT_FONT = '-apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif';
   function wrapLines(ctx, text, maxW) {
     const out = [];
     for (const para of text.split('\n')) {
@@ -578,6 +578,21 @@ function startHome() {
   const tb = $('textBox');
   tb.contentEditable = 'plaintext-only'; if (tb.contentEditable !== 'plaintext-only') tb.contentEditable = 'true';
   const readBox = () => tb.innerText.replace(/\n$/, '');
+  // size the on-screen (editable) text by measuring it, so the whole text is always visible
+  function fitBox() {
+    const st = $('textStage'); if (!st.clientWidth) return;
+    const maxH = st.clientHeight * 0.86;
+    tb.style.overflowWrap = 'normal';
+    let lo = 8, hi = Math.floor(Math.min(st.clientWidth, st.clientHeight) * 0.7), best = lo;
+    const fits = () => tb.scrollHeight <= maxH && tb.scrollWidth <= tb.clientWidth + 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      tb.style.fontSize = mid + 'px';
+      if (fits()) { best = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    tb.style.fontSize = best + 'px';
+    if (!fits()) tb.style.overflowWrap = 'anywhere'; // a single very long word: allow breaking it
+  }
   function streamFromText(h) {
     // frame has the shape of the preview area; shorter side = chosen quality
     const r = $('stage').getBoundingClientRect(), w = r.width - 16, hh = r.height - 16;
@@ -586,8 +601,7 @@ function startHome() {
     const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
     canvas.width = Math.round(aspect * k) & ~1; canvas.height = Math.round(k) & ~1;
     // the preview shows the editable text itself, sized like the streamed frame
-    const fitBox = (best) => { const sc = $('textStage').clientWidth / canvas.width; if (sc > 0) tb.style.fontSize = (best * sc).toFixed(1) + 'px'; };
-    const draw = () => fitBox(drawText(canvas, ctx, textValue));
+    const draw = () => { drawText(canvas, ctx, textValue); fitBox(); };
     if (readBox() !== textValue) tb.innerText = textValue;
     tb.classList.toggle('empty', !textValue.trim());
     draw();
