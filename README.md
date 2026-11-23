@@ -1,58 +1,45 @@
 # WebShare
 
-Share your **camera** or **screen** from a web browser and watch it on any other device on the
-network by simply opening `http://<ip>:8080` in a browser. No app to install for viewers,
-no npm dependencies for the server.
+Share your **camera, screen, a photo/video or your own text** from a browser and watch it in any
+other browser – no app needed.
 
-## Run
+Two ways to run the same app:
+
+| | Online – GitHub Pages | Offline – your own network |
+| --- | --- | --- |
+| Open | https://umilan.github.io/webshare/ | `node server.js` on a computer |
+| Watch link | `https://umilan.github.io/webshare/?watch=CODE` | `http://<computer IP>:8080/?watch=CODE` |
+| Internet needed | yes (free PeerJS service connects the browsers) | **no** – the server connects them |
+| Viewers | anywhere | same Wi-Fi / LAN (or VPN like Tailscale) |
+
+Video always goes directly between the browsers (WebRTC).
+
+## Offline / IP mode
 
 ```bash
-node server.js        # or: npm start
+node server.js            # Node 16+, no npm install needed
 ```
 
-The console prints every address, e.g.:
+The console prints the addresses:
 
 ```
-SHARE (on this computer):   http://localhost:8080/share
-SHARE (from other device):  https://192.168.1.20:8443/share
-WATCH (any browser, no app): http://192.168.1.20:8080/
-Plain MJPEG stream:          http://192.168.1.20:8080/stream.mjpg
+Share from this computer:   http://localhost:8080/
+Share from a phone:         https://192.168.1.20:8443/   (accept the certificate warning once)
+Watch (any browser on this network):
+   http://192.168.1.20:8080/?watch=CODE
 ```
 
-1. On the computer running the server open **http://localhost:8080/share**, pick *Screen* or
-   *Camera*, press **Start sharing**.
-2. On any phone / tablet / TV / PC open **http://&lt;ip&gt;:8080/** — the picture appears.
+* Press **Transmit**, then **Share** – the link and QR code use the computer's IP address.
+* Phones need a secure page for the camera, so opening `http://<ip>:8080/` on a phone automatically
+  switches to `https://<ip>:8443/` (self-signed certificate, generated with `openssl` into `certs/`).
+  Watching works over plain `http://`.
+* `server.js` serves `docs/` and contains a small PeerJS-compatible signaling server (WebSocket),
+  so there are no dependencies and no external requests. The JS libraries are bundled in `docs/vendor/`.
+* Ports: `PORT=8080`, `HTTPS_PORT=8443`, `NO_HTTPS=1` disables HTTPS. Allow these in your firewall.
+* No authentication – anyone on your network with the code can watch.
 
-## How it works
+## Files
 
-| URL | What it is |
-| --- | --- |
-| `/share` | Sharer page (screen, window, tab or camera, optional audio, 480p–1080p) |
-| `/` | Viewer page – WebRTC (low latency, audio); falls back to MJPEG automatically after 10 s |
-| `/?mode=mjpeg` | Viewer forced to MJPEG |
-| `/stream.mjpg` | Raw MJPEG stream – works in VLC, smart‑TV browsers, `<img src>` tags, OBS browser source |
-| `/snapshot.jpg` | Last MJPEG frame (only refreshed while an MJPEG viewer is connected) |
-| `?room=name` | Add to any URL to run several independent shares at once |
-
-* Signaling uses Server‑Sent Events + POST, so the server is plain Node.js with zero dependencies.
-* Video goes peer‑to‑peer (WebRTC) from the sharing browser to each viewer; the MJPEG fallback
-  is relayed through the server at ~10 fps and is only encoded while someone watches it.
-
-## Notes
-
-* Browsers only allow camera/screen capture on **secure pages**: `http://localhost` is fine on the
-  server machine. To share a phone's camera, open `https://<ip>:8443/share` and accept the
-  self‑signed certificate warning (generated automatically into `certs/` with `openssl`).
-* Mobile browsers generally can't share their screen — use *Camera* there.
-* Viewers start muted (autoplay rules); tap **Unmute** if audio was shared.
-* Ports: `PORT=8080`, `HTTPS_PORT=8443`, set `NO_HTTPS=1` to disable HTTPS. Allow these ports in
-  your firewall if other devices can't connect.
-* No authentication – anyone on your network who knows the address can watch. Use on trusted networks.
-
-## GitHub Pages version (no server)
-
-`docs/index.html` is a single-file version hosted at **https://umilan.github.io/webshare/**.
-GitHub Pages can't run `server.js`, so it uses the free PeerJS cloud service to connect the browsers
-(video still goes directly between them). Press **Start sharing**, then open the shown link,
-scan the QR code, or type the 6-letter code on another device. Because github.io is HTTPS,
-phones can share their camera too. There is no IP address or MJPEG stream in this version.
+* `docs/index.html` – the whole app (sharer + viewer), also published to GitHub Pages.
+* `docs/vendor/` – PeerJS 1.5.4, qrcodejs 1.0.0, jsQR 1.4.0 (MIT).
+* `server.js` – offline server for your own network.

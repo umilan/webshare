@@ -1,7 +1,7 @@
 {
   "name": "webshare",
   "version": "1.0.0",
-  "description": "Share your camera or screen from a browser and watch it from any other browser via http://<ip>:8080 - no app needed.",
+  "description": "Share camera, screen, media or text from a browser and watch it in any browser - online (GitHub Pages) or offline on your own network (node server.js).",
   "main": "server.js",
   "scripts": { "start": "node server.js" },
   "engines": { "node": ">=16" },

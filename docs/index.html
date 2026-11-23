@@ -6,8 +6,9 @@
 <title>WebShare</title>
 <meta name="description" content="Share your camera or screen and watch it in any browser – no app needed.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- bundled locally so the app also works offline on the local server (MIT licensed: PeerJS 1.5.4, qrcodejs 1.0.0, jsQR 1.4.0) -->
+<script src="vendor/peerjs.min.js"></script>
+<script src="vendor/qrcode.min.js"></script>
 <style>
 :root { --bg:#0f1115; --panel:#181b22; --line:#2a2f3a; --text:#e8eaf0; --muted:#9aa3b2; --accent:#4f8cff; --bad:#ff5c5c; }
 * { box-sizing:border-box; }
@@ -371,7 +372,7 @@ input[type=text] { padding:0 14px; display:block; }
 
 <script>
 const $ = (id) => document.getElementById(id);
-const APP_VERSION = '1.27.3'; // bump on every published change
+const APP_VERSION = '1.28.0'; // bump on every published change
 const PREFIX = 'webshare-v1-';
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
@@ -393,7 +394,23 @@ function hideEl(el) {
 }
 let toastT;
 function toast(text) { const t = $('toast'); t.textContent = text; showEl(t); clearTimeout(toastT); toastT = setTimeout(() => hideEl(t), 5000); }
-const watchUrl = (code) => `${location.origin}${location.pathname}?watch=${code}`;
+// ---- local server mode (node server.js): signaling on this server, IP-based watch links, no internet needed
+const LOCAL = window.WEBSHARE_LOCAL || null;
+const PEER_OPTS = LOCAL ? {
+  host: location.hostname, port: +location.port || (location.protocol === 'https:' ? 443 : 80), path: '/',
+  secure: location.protocol === 'https:', config: { iceServers: [] }, // same network: direct connections only
+} : undefined;
+const newPeer = (id) => LOCAL ? (id ? new Peer(id, PEER_OPTS) : new Peer(PEER_OPTS)) : (id ? new Peer(id) : new Peer());
+const watchUrl = (code) => {
+  if (!LOCAL) return `${location.origin}${location.pathname}?watch=${code}`;
+  // viewers use plain http on the LAN IP (no certificate warning); never hand out "localhost"
+  const host = /^(localhost|127\.|\[?::1)/.test(location.hostname) ? (LOCAL.ips[0] || location.hostname) : location.hostname;
+  return `http://${host}:${LOCAL.httpPort}${location.pathname}?watch=${code}`;
+};
+// phones opening the http address can't use the camera (needs a secure page) -> go to the https one
+if (LOCAL && !window.isSecureContext && LOCAL.httpsPort && !new URLSearchParams(location.search).get('watch')) {
+  location.replace(`https://${location.hostname}:${LOCAL.httpsPort}${location.pathname}`);
+}
 
 document.querySelectorAll('.ver').forEach(e => e.textContent = 'v' + APP_VERSION);
 const watchCode = (new URLSearchParams(location.search).get('watch') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -824,7 +841,7 @@ function startHome() {
 
   function openPeer() {
     pill($('status'), 'connecting…');
-    peer = new Peer(PREFIX + code);
+    peer = newPeer(PREFIX + code);
     peer.on('open', () => {
       store.set('webshare-code', code);
       if (!broadcasting) return;
@@ -835,7 +852,8 @@ function startHome() {
       conn.on('open', () => { conns.set(conn.peer, { conn, call: null }); callViewer(conn.peer); updateCount(); });
       conn.on('close', () => { conns.get(conn.peer)?.call?.close(); conns.delete(conn.peer); updateCount(); });
     });
-    peer.on('disconnected', () => { if (peer && !peer.destroyed) { pill($('status'), 'reconnecting…'); setTimeout(() => peer && !peer.destroyed && peer.reconnect(), 1500); } });
+    const me = peer; // timers must only touch this instance, never a newer one created after Stop / Transmit
+    peer.on('disconnected', () => { if (me === peer && !me.destroyed) { pill($('status'), 'reconnecting…'); setTimeout(() => { if (me === peer && !me.destroyed && me.disconnected) me.reconnect(); }, 1500); } });
     peer.on('error', (err) => {
       if (err.type === 'unavailable-id') { // code taken (e.g. open in another tab) -> new code
         peer.destroy(); code = randomCode(); openPeer();
@@ -894,7 +912,7 @@ function startHome() {
   let scanStream = null, scanTimer = null, detector = null;
   const loadJsQR = () => window.jsQR ? Promise.resolve() : new Promise((ok, fail) => {
     const sc = document.createElement('script');
-    sc.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js'; sc.onload = ok; sc.onerror = fail;
+    sc.src = 'vendor/jsQR.min.js'; sc.onload = ok; sc.onerror = fail;
     document.head.appendChild(sc);
   });
   // accepts a full watch link (…?watch=CODE) or a bare code
@@ -981,7 +999,7 @@ function startViewer(code) {
     conn.on('close', waiting);
   }
 
-  peer = new Peer();
+  peer = newPeer();
   peer.on('open', connect);
   peer.on('call', (call) => {
     call.answer();
